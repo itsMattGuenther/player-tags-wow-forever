@@ -32,9 +32,29 @@ local function paintButton(b, on)
 	b.isOn = on
 end
 
+local function describe(id, rec)
+	local level = id.level or (rec and rec.level)
+	local race = id.race or (rec and rec.race)
+	local class = UI.ClassName(id.class or (rec and rec.class))
+	local parts = {}
+	if level then parts[#parts + 1] = "Level " .. level end
+	if race then parts[#parts + 1] = race end
+	if class then parts[#parts + 1] = class end
+	if #parts > 0 then return table.concat(parts, " ") end
+	-- Tagged from a chat name, so the game never told us level, race or
+	-- class. Say when and where, the same way the list's Last seen column does.
+	if rec and rec.seen then
+		local seen = "Last seen " .. ns.Ago(rec.seen)
+		if ns.IsText(rec.seenZone) then seen = seen .. ", " .. rec.seenZone end
+		return seen
+	end
+	return "Not tagged yet"
+end
+
 local function refresh()
 	if not frame or not current then return end
 	local rec = ns.Lookup(current)
+	frame.sub:SetText(describe(current, rec))
 	for _, b in ipairs(buttons) do
 		if b:IsShown() then paintButton(b, rec ~= nil and rec.tags[b.tagId] ~= nil) end
 	end
@@ -161,6 +181,9 @@ local function build()
 	frame.who:SetPoint("TOPLEFT", frame.title, "BOTTOMLEFT", 0, -6)
 	frame.sub = UI.Text(frame, "GameFontDisableSmall")
 	frame.sub:SetPoint("TOPLEFT", frame.who, "BOTTOMLEFT", 0, -2)
+	frame.sub:SetPoint("RIGHT", frame, "RIGHT", -PAD, 0)
+	frame.sub:SetJustifyH("LEFT")
+	frame.sub:SetWordWrap(false)
 
 	frame.noteLabel = UI.Text(frame, "GameFontDisableSmall", "NOTE")
 	frame.note = UI.Edit(frame, WIDTH - PAD * 2, 24, "Add a note (optional), then press Enter")
@@ -190,18 +213,6 @@ local function build()
 	end)
 end
 
-local function describe(id, rec)
-	local level = id.level or (rec and rec.level)
-	local race = id.race or (rec and rec.race)
-	local class = UI.ClassName(id.class or (rec and rec.class))
-	local parts = {}
-	if level then parts[#parts + 1] = "Level " .. level end
-	if race then parts[#parts + 1] = race end
-	if class then parts[#parts + 1] = class end
-	if #parts == 0 then return "Not seen in person yet" end
-	return table.concat(parts, " ")
-end
-
 --- Opens the popup for an identity. With an anchor (the list window) it
 --- opens beside it. Otherwise it opens in the middle of the screen, or where
 --- it was last dragged to, or at the mouse if that option is on.
@@ -220,7 +231,6 @@ function ns.OpenQuickTag(id, anchor)
 	local rec = ns.Lookup(id)
 	local name = (id.live and id.name) or (rec and rec.name) or id.name
 	frame.who:SetText(ns.ClassColorCode(id.class or (rec and rec.class)) .. name .. "|r")
-	frame.sub:SetText(describe(id, rec))
 	frame.note:SetText(rec and rec.note or "")
 	frame.note:ClearFocus()
 	frame.note:Refresh()

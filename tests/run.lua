@@ -316,6 +316,24 @@ check("menu works from a chat name", made["Tag player"] ~= nil and made["Remove 
 made["Tag player"]()
 check("Tag player opens the popup", PlayerTagsPopup:IsShown())
 ns.CloseQuickTag()
+-- A chat name the game knows nothing else about: no level, race or class.
+made = {}
+world.chatGuids = { [8] = "Player-1-WREN" }
+H.menuHooks.MENU_UNIT_FRIEND(nil, root, { name = "Wren", surname = "Hollis", lineID = 8 })
+local function sub() return PlayerTagsPopup.sub:GetText() or "" end
+made["Tag player"]()
+check("a chat name nobody has tagged says so", sub() == "Not tagged yet", sub())
+local helpfulButton = H.find(PlayerTagsPopup, function(o) return rawget(o, "tagId") == "helpful" end)[1]
+H.run(helpfulButton, "OnClick")
+check("after the first tag it says when and where, like the list", sub():find("^Last seen just now") ~= nil, sub())
+ns.CloseQuickTag()
+world.now = world.now + 300
+made["Tag player"]()
+check("reopened later, the popup gives the age", sub():find("^Last seen 5 min ago") ~= nil, sub())
+H.run(helpfulButton, "OnClick")
+check("taking the only tag off forgets the player again", sub() == "Not tagged yet", sub())
+world.now = world.now - 300
+ns.CloseQuickTag()
 made = {}
 H.menuHooks.MENU_UNIT_PLAYER(nil, root, { name = "Matt", surname = "Tester" })
 check("no menu entry for yourself", #made == 0)
