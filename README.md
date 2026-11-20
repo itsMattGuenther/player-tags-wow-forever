@@ -132,3 +132,7 @@ screenshots/       images used in this README
 - Regenerate the icons with `python3 tools/build_icons.py`. Add new glyphs at the end and never reorder them.
 - Build the release zip with `tools/package.sh`. It writes `dist/PlayerTags.zip`.
 - For local work, symlink `PlayerTags/` into `_forever_/Interface/AddOns`. `/reload` picks up code changes. New files or a changed `.toc` need a full restart of the game.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
