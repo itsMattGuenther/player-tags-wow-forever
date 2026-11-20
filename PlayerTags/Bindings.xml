@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="PLAYERTAGS_TAG" header="PLAYERTAGS" category="ADDONS">
+		PlayerTags_QuickTag()
+	</Binding>
+	<Binding name="PLAYERTAGS_WINDOW" category="ADDONS">
+		PlayerTags_ToggleWindow()
+	</Binding>
+</Bindings>
