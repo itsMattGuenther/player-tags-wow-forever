@@ -14,7 +14,9 @@ local function taggedRecord(unit)
 	if unit == nil or ns.IsSecret(unit) or type(unit) ~= "string" then return nil end
 	local id = ns.IdentifyUnit(unit)
 	if not id or ns.IsMe(id) then return nil end
-	local rec = ns.Lookup(id)
+	-- Touch, not just look up: a target or group member is someone you can
+	-- see, so their class and level are brought up to date.
+	local rec = ns.Touch(id)
 	if rec and ns.HasTags(rec) then return rec end
 	return nil
 end

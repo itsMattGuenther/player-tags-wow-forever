@@ -139,12 +139,33 @@ function ns.IdentifyUnit(unit)
 	return id
 end
 
---- An identity built from a name alone (chat, lists, slash commands).
+-- What the game remembers about a GUID. It keeps class, race and level for
+-- players it has shown you recently; that is how chat colours names by
+-- class. It can answer with nothing, for someone it has not seen lately.
+local function cached(guid)
+	if not ns.IsText(guid) or type(GetPlayerInfoByGUID) ~= "function" then return nil end
+	local ok, _, class, race, _, _, _, _, level = pcall(GetPlayerInfoByGUID, guid)
+	if not ok then return nil end
+	local facts = {}
+	if ns.IsText(class) then facts.class = class end
+	if ns.IsText(race) then facts.race = race end
+	level = ns.Num(level)
+	if level and level > 0 then facts.level = level end
+	if next(facts) == nil then return nil end
+	return facts
+end
+
+--- An identity built from a name alone (chat, lists, slash commands). With
+--- a GUID, the game's memory of that player fills in class, race and level.
 function ns.IdentifyName(fullName, guid)
 	local key = ns.Key(fullName)
 	if not key then return nil end
 	local id = { key = key, name = ns.Trim(fullName) }
-	if ns.IsText(guid) then id.guid = guid end
+	if ns.IsText(guid) then
+		id.guid = guid
+		local facts = cached(guid)
+		if facts then id.class, id.race, id.level = facts.class, facts.race, facts.level end
+	end
 	return id
 end
 
@@ -339,6 +360,29 @@ function ns.Touch(id)
 	local c = context()
 	rec.seen, rec.seenZone = c.t, c.zone
 	return rec, key
+end
+
+--- Fills in what a record is missing: its GUID from a chat line, then its
+--- class, race and level from the game's memory of that GUID. Never
+--- overwrites what the record already has. Returns true if it changed.
+function ns.Learn(rec, key, guid)
+	if not rec then return false end
+	local changed = false
+	if not rec.guid and key and ns.IsText(guid) and ns.guidIndex[guid] == nil then
+		rec.guid = guid
+		ns.guidIndex[guid] = key
+		changed = true
+	end
+	if rec.class and rec.race and rec.level then return changed end
+	local facts = cached(rec.guid)
+	if not facts then return changed end
+	for _, field in ipairs({ "class", "race", "level" }) do
+		if rec[field] == nil and facts[field] ~= nil then
+			rec[field] = facts[field]
+			changed = true
+		end
+	end
+	return changed
 end
 
 function ns.PlayerCount()

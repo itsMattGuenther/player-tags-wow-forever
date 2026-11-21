@@ -57,9 +57,22 @@ local function buildPlayerList()
 	players.list = list
 end
 
+-- Players tagged from a chat name have no class until the game tells us.
+-- Ask its memory of them each time the list is drawn.
+local function learnMissing()
+	local changed = false
+	for key, rec in pairs(ns.db.players) do
+		if rec.guid and not (rec.class and rec.race and rec.level) and ns.Learn(rec, key) then
+			changed = true
+		end
+	end
+	return changed
+end
+
 local function refreshPlayers()
 	local page = pages.players
 	if not page then return end
+	learnMissing()
 	buildPlayerList()
 	local total = #players.list
 	players.offset = clamp(players.offset, 0, math.max(0, total - VISIBLE))
@@ -172,7 +185,9 @@ local function makePlayerRow(page, index)
 		if not rec then return end
 		local id = ns.IdentifyName(rec.name or self.key, rec.guid)
 		if id then
-			id.class, id.level, id.race = rec.class, rec.level, rec.race
+			id.class = id.class or rec.class
+			id.level = id.level or rec.level
+			id.race = id.race or rec.race
 			ns.OpenQuickTag(id, frame)
 		end
 	end)
@@ -659,6 +674,11 @@ function ns.ShowWindow(tab, search)
 		pages.players.search:Refresh()
 	end
 	if frame:IsShown() then selectTab(currentTab) else frame:Show() end
+	-- The game can need a moment to look up a player it has not seen this
+	-- session, so ask once more shortly after the list opens.
+	ns.Debounce("list learn", 2, function()
+		if frame:IsShown() and currentTab == "players" and learnMissing() then refreshPlayers() end
+	end)
 end
 
 function ns.ToggleWindow()

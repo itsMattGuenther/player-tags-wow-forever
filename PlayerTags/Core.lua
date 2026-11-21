@@ -177,13 +177,17 @@ function ns.Ago(stamp)
 	return math.floor(d / 365) .. " years ago"
 end
 
---- "|cffRRGGBB" for a class file name such as "WARRIOR", or white.
+-- A name whose class is not known yet. Not white: white is the priest colour.
+ns.UNKNOWN_CLASS_COLOR = "|cffa7afb8"
+
+--- "|cffRRGGBB" for a class file name such as "WARRIOR", or a neutral grey
+--- when the class is not known.
 function ns.ClassColorCode(class)
 	local c = class and _G.RAID_CLASS_COLORS and _G.RAID_CLASS_COLORS[class]
 	if c and c.r then
 		return string.format("|cff%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255)
 	end
-	return "|cffffffff"
+	return ns.UNKNOWN_CLASS_COLOR
 end
 
 function ns.ColoredName(rec, fallback)

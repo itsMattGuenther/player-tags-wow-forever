@@ -29,9 +29,12 @@ local function identity(context)
 		full = ns.FullName(name, surname)
 	end
 
+	-- Friends, guild and recent-ally lists hand over the GUID directly; a
+	-- chat name gives its line, which the game can turn into one.
 	local guid
+	if ns.IsText(context.guid) then guid = context.guid end
 	local lineID = context.lineID
-	if lineID ~= nil and not ns.IsSecret(lineID) and C_ChatInfo and C_ChatInfo.GetChatLineSenderGUID then
+	if not guid and lineID ~= nil and not ns.IsSecret(lineID) and C_ChatInfo and C_ChatInfo.GetChatLineSenderGUID then
 		local ok, found = pcall(C_ChatInfo.GetChatLineSenderGUID, lineID)
 		if ok and ns.IsText(found) then guid = found end
 	end

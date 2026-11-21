@@ -4,19 +4,25 @@ local _, ns = ...
 local DIM = { 0.65, 0.69, 0.72 }
 
 local function resolve(tooltip, data)
-	-- The tooltip's own GUID is the surest match and survives renames.
-	local guid = type(data) == "table" and data.guid or nil
-	if ns.IsText(guid) then
-		local rec = ns.GetRecordByGUID(guid)
-		if rec then return rec end
-	end
-	-- Then the unit the tooltip reports. Some tooltips hand back a hidden
-	-- unit that cannot be inspected, so fall back to the mouseover unit.
+	-- The unit the tooltip reports. Some tooltips hand back a hidden unit
+	-- that cannot be inspected, so fall back to the mouseover unit.
 	local id
 	local ok, _, unit = pcall(tooltip.GetUnit, tooltip)
 	if ok then id = ns.IdentifyUnit(unit) end
 	if not id then id = ns.IdentifyUnit("mouseover") end
-	if id then return (ns.Lookup(id)) end
+
+	-- The tooltip's own GUID is the surest match and survives renames.
+	local guid = type(data) == "table" and data.guid or nil
+	if ns.IsText(guid) then
+		local rec = ns.GetRecordByGUID(guid)
+		if rec then
+			-- Pointing at someone counts as seeing them: it fills in the
+			-- class of a player who was tagged from a chat name.
+			if id and id.guid == guid then ns.Touch(id) end
+			return rec
+		end
+	end
+	if id then return (ns.Touch(id)) end
 	return nil
 end
 

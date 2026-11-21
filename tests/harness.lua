@@ -262,6 +262,14 @@ function H.install()
 	}
 	G.C_NamePlate = { GetNamePlateForUnit = function(token) return world.plates[token] end }
 	G.C_ChatInfo = { GetChatLineSenderGUID = function(lineID) return world.chatGuids and world.chatGuids[lineID] end }
+	-- The game's memory of players it has shown you. Empty unless a check
+	-- fills world.playerCache, and then it answers with the real 8 values.
+	G.GetPlayerInfoByGUID = function(guid)
+		local p = world.playerCache and world.playerCache[guid]
+		if not p then return end
+		local localized = G.LOCALIZED_CLASS_NAMES_MALE[p.class] or p.class
+		return localized, p.class, p.race, p.race, 2, p.name or "", "", p.level
+	end
 	G.C_LFGList = {
 		GetSearchResultInfo = function(id) return world.listings and world.listings[id] end,
 		GetSearchResultPlayerInfo = function(id, index)

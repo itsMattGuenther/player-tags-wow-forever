@@ -580,6 +580,96 @@ _G[listed]("PlayerTags", "LeftButton")
 check("the minimap button's texture file exists", io.open("PlayerTags/Media/minimap.tga", "rb") ~= nil)
 check("the minimap button ran without problems", #ns.errors == 0, ns.errors[1])
 
+section("class from the game's memory")
+-- Players tagged from a chat name used to stay classless, and the list drew
+-- them white, the priest colour. These are the ways a class now arrives.
+world.playerCache = {}
+local function known(name) return ns.GetRecord(ns.Key(name)) end
+check("an unknown class is not drawn in the priest colour", ns.ClassColorCode(nil) ~= ns.ClassColorCode("PRIEST"))
+
+-- A chat line: the record learns its GUID, then its class once the game knows it.
+ns.SetTag(ns.IdentifyName("Lark Pembrook"), "helpful", true)
+local lark = known("Lark Pembrook")
+check("a player tagged from a bare name starts with no class", lark and lark.class == nil and lark.guid == nil)
+ns.settings.chat = false
+filter("CHAT_MSG_SAY", "[Lark Pembrook]", chatArgs("Lark Pembrook", "Player-1-LARK"))
+check("a chat line gives a bare-name record its GUID, even with chat icons off", lark.guid == "Player-1-LARK" and ns.GetRecordByGUID("Player-1-LARK") == lark)
+check("when the game knows nothing yet, the class stays unknown", lark.class == nil)
+world.playerCache["Player-1-LARK"] = { class = "ROGUE", race = "Human", level = 22 }
+filter("CHAT_MSG_SAY", "[Lark Pembrook]", chatArgs("Lark Pembrook", "Player-1-LARK"))
+check("the next chat line fills in class, race and level", lark.class == "ROGUE" and lark.race == "Human" and lark.level == 22)
+ns.settings.chat = true
+H.flush()
+ns.SetTag(ns.IdentifyName("Moss Tanner"), "quiet", true)
+local moss = known("Moss Tanner")
+check("a GUID that belongs to another record is not handed out", ns.Learn(moss, "moss tanner", "Player-1-LARK") == false and moss.guid == nil)
+filter("CHAT_MSG_SAY", "[Moss Tanner]", chatArgs("Moss Tanner", H.SECRET))
+check("a hidden GUID in chat changes nothing", moss.guid == nil and #ns.errors == 0, ns.errors[1])
+world.playerCache["Player-1-LARK"] = { class = "PRIEST", race = "Gnome", level = 60 }
+ns.Learn(lark, "lark pembrook")
+check("what a record already knows is never overwritten", lark.class == "ROGUE" and lark.race == "Human" and lark.level == 22)
+
+-- Tagging from a chat name or a friends list now saves the class at once.
+made = {}
+world.chatGuids = { [9] = "Player-1-BRIN" }
+world.playerCache["Player-1-BRIN"] = { class = "MAGE", race = "Skyborne", level = 28 }
+H.menuHooks.MENU_UNIT_FRIEND(nil, root, { name = "Brin", surname = "Talmore", lineID = 9 })
+made["Tag player"]()
+check("the popup for a chat name gives level, race and class", sub() == "Level 28 Skyborne Mage", sub())
+H.run(helpfulButton, "OnClick")
+check("tagging from a chat name saves the class", known("Brin Talmore") and known("Brin Talmore").class == "MAGE")
+ns.CloseQuickTag()
+made = {}
+world.playerCache["Player-1-CAEL"] = { class = "WARRIOR", race = "Dwarf", level = 40 }
+H.menuHooks.MENU_UNIT_FRIEND(nil, root, { name = "Cael", surname = "Vorn", guid = "Player-1-CAEL" })
+made["Tag player"]()
+H.run(helpfulButton, "OnClick")
+local cael = known("Cael Vorn")
+check("a menu that hands over a GUID saves it and the class", cael and cael.guid == "Player-1-CAEL" and cael.class == "WARRIOR")
+ns.CloseQuickTag()
+
+-- Seeing them: pointing at them or targeting them fills in the class.
+ns.SetTag(ns.IdentifyName("Ivy Corran", "Player-1-IVY"), "patient", true)
+local ivy = known("Ivy Corran")
+check("tagged with a GUID the game did not know", ivy.guid == "Player-1-IVY" and ivy.class == nil)
+world.units.mouseover = { name = "Ivy", surname = "Corran", guid = "Player-1-IVY", class = "PRIEST", level = 33, race = "Human" }
+GameTooltip.__lines = {}
+post(GameTooltip, { guid = "Player-1-IVY" })
+check("pointing at them fills in the class", ivy.class == "PRIEST" and ivy.level == 33 and #GameTooltip.__lines > 0)
+world.units.mouseover = { name = "Moss", surname = "Tanner", guid = "Player-1-MOSS", class = "ROGUE", level = 19, race = "Dwarf" }
+GameTooltip.__lines = {}
+post(GameTooltip, { guid = "Player-1-MOSS" })
+check("pointing at a bare-name player gives them a GUID and a class", moss.guid == "Player-1-MOSS" and moss.class == "ROGUE" and #GameTooltip.__lines > 0)
+world.units.mouseover = nil
+ns.SetTag(ns.IdentifyName("Rook Hale"), "tank", true)
+world.units.target = { name = "Rook", surname = "Hale", guid = "Player-1-ROOK", class = "WARRIOR", level = 38, race = "Human" }
+H.fire("PLAYER_TARGET_CHANGED")
+H.flush()
+check("targeting them fills in the class", known("Rook Hale").class == "WARRIOR" and known("Rook Hale").guid == "Player-1-ROOK")
+world.units.target = nil
+H.fire("PLAYER_TARGET_CHANGED")
+H.flush()
+
+-- The list asks the game about everyone still missing a class.
+ns.SetTag(ns.IdentifyName("Fen Marlow", "Player-1-FEN"), "generous", true)
+ns.ShowWindow("players", "fen marlow")
+local fenRow = H.find(PlayerTagsFrame, function(o) return rawget(o, "del") ~= nil and rawget(o, "key") == "fen marlow" and o:IsShown() end)[1]
+check("an unknown class shows grey in the list, not white", fenRow and fenRow.name:GetText():sub(1, 10) == ns.UNKNOWN_CLASS_COLOR, fenRow and fenRow.name:GetText())
+world.playerCache["Player-1-FEN"] = { class = "MAGE", race = "Skyborne", level = 30 }
+H.flush()
+check("a moment after the list opens it asks again and colours the name", fenRow.name:GetText():sub(1, 10) == ns.ClassColorCode("MAGE") and known("Fen Marlow").class == "MAGE", fenRow.name:GetText())
+H.run(fenRow, "OnClick")
+check("the popup from the list keeps what the game knows", PlayerTagsPopup.sub:GetText() == "Level 30 Skyborne Mage", PlayerTagsPopup.sub:GetText())
+ns.CloseQuickTag()
+ns.ShowWindow("players", "")
+ns.ToggleWindow()
+
+for _, name in ipairs({ "Lark Pembrook", "Moss Tanner", "Brin Talmore", "Cael Vorn", "Ivy Corran", "Rook Hale", "Fen Marlow" }) do
+	ns.DeleteRecord(ns.Key(name))
+end
+world.playerCache, world.chatGuids = nil, nil
+check("learning classes ran without problems", #ns.errors == 0, ns.errors[1])
+
 section("saved data stays clean")
 local function plain(value, path)
 	local kind = type(value)

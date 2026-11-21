@@ -40,7 +40,7 @@ You can rename them, hide the ones you don't use, and make your own.
 - **Group Finder:** the leader's tags on a listing, and a count of other tagged players in the group.
 - **Nameplates:** up to three icons by default (Avoid tags first), over enemy players in the open world.
 
-**Your list.** `/tags` opens everyone you've tagged. You can search by name, tag or note, filter by family, and click a row to edit it.
+**Your list.** `/tags` opens everyone you've tagged. You can search by name, tag or note, filter by family, and click a row to edit it. Names are in class colours. A grey name means the game hasn't told the addon that player's class yet. It fills in when you point at them or target them, and usually when they talk in chat.
 
 ![A tagged player's tooltip and target frame](screenshots/02-tooltip-and-target-frame.png)
 
