@@ -12,7 +12,7 @@ Everything stays on your computer. Nobody else can see your tags, and other play
 
 **[Download the latest version](https://github.com/itsMattGuenther/player-tags-wow-forever/releases/latest/download/PlayerTags.zip)** · [All releases](https://github.com/itsMattGuenther/player-tags-wow-forever/releases)
 
-> **Beta.** Version 1.0.0-beta.3 is built for WoW: Forever (interface 16001) and has been played in game. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
+> **Beta.** Version 1.0.0-beta.4 is built for WoW: Forever (interface 16001) and has been played in game. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
 
 ## What you get
 
