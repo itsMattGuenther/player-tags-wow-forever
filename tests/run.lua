@@ -31,7 +31,7 @@ local TESSA = { name = "Tessa", surname = "Brightwell", guid = "Player-1-TESSA",
 local VELRA = { name = "Velra", surname = "Duskwhisper", guid = "Player-1-VELRA", class = "ROGUE", level = 36, race = "Orc", faction = "Horde" }
 
 section("startup")
-check("all files listed in the toc load", #files == 17, #files)
+check("all files listed in the toc load", #files == 19, #files)
 H.fire("ADDON_LOADED", "PlayerTags")
 H.fire("PLAYER_LOGIN")
 check("database created", type(PlayerTagsDB) == "table" and type(PlayerTagsDB.players) == "table")
@@ -263,9 +263,9 @@ check("popup has a button for every visible tag", #tagButtons == #ns.AllTags(fal
 local patientButton
 for _, b in ipairs(tagButtons) do if b.tagId == "patient" then patientButton = b end end
 H.run(patientButton, "OnClick")
-check("clicking a tag button applies it at once", ns.GetRecord("tessa brightwell").tags.patient ~= nil and patientButton.isOn == true)
+check("clicking a tag button applies it at once", ns.GetRecord("tessa brightwell").tags.patient ~= nil and patientButton.on == true and patientButton:GetChecked())
 H.run(patientButton, "OnClick")
-check("clicking again removes it", ns.GetRecord("tessa brightwell").tags.patient == nil and patientButton.isOn == false)
+check("clicking again removes it", ns.GetRecord("tessa brightwell").tags.patient == nil and patientButton.on == false and not patientButton:GetChecked())
 popup.note:SetText("Ported us for free")
 H.run(popup.note, "OnEnterPressed")
 check("the note box saves on Enter", ns.GetRecord("tessa brightwell").note == "Ported us for free")
@@ -349,7 +349,8 @@ H.fire("GROUP_ROSTER_UPDATE")
 H.flush()
 check("alert names the tagged member", chatHas("1 tagged player in your group") and chatHas("Gorrim Ashmantle"))
 check("Avoid tag plays the warning sound", world.lastSound == 8959)
-check("banner shown", #world.banner > 0)
+check("the alert box shows it", ns.IsAlertShown() and PlayerTagsAlert.title:GetText():find("1 tagged player", 1, true) ~= nil)
+check("nothing goes to the game's error-message area", #world.banner == 0)
 world.chat = {}
 H.fire("GROUP_ROSTER_UPDATE")
 H.flush()
@@ -477,8 +478,11 @@ check("window opens", PlayerTagsFrame ~= nil and PlayerTagsFrame:IsShown())
 at = H.anchor(PlayerTagsFrame)
 check("the window opens in the middle of the screen the first time", at.point == "CENTER" and at.rel == UIParent and at.relPoint == "CENTER" and at.x == 0 and at.y == 0, tostring(at.point) .. " " .. tostring(at.x) .. "," .. tostring(at.y))
 check("only one anchor holds the window", #PlayerTagsFrame.__points == 1, #PlayerTagsFrame.__points)
+check("the window is the game's standard frame", PlayerTagsFrame.CloseButton ~= nil and PlayerTagsFrame.Inset ~= nil and PlayerTagsFrame:GetTitleText():GetText() == "Player Tags")
+check("two tabs along the bottom", #PlayerTagsFrame.Tabs == 2 and PlayerTagsFrame.selectedTab == 1, PlayerTagsFrame.selectedTab)
+H.run(PlayerTagsFrame.Tabs[2], "OnClick")
+check("the Tags tab is chosen from its tab", PlayerTagsFrame.selectedTab == 2)
 ns.ShowWindow("tags")
-ns.ShowWindow("options")
 ns.ShowWindow("players", "gorrim")
 local shownRows = H.find(PlayerTagsFrame, function(o) return rawget(o, "del") ~= nil and rawget(o, "key") ~= nil and o:IsShown() end)
 check("search narrows the list to one player", #shownRows == 1 and shownRows[1].key == "gorrim ashmantle", #shownRows)
@@ -509,17 +513,16 @@ ns.UI.Place(fresh, "window")
 check("after a reload the window opens where it was left", H.anchor(fresh).x == -300 and H.anchor(fresh).y == 50)
 ns.InitDB()
 check("remembered positions survive a reload", ns.db.positions.window.x == -300 and ns.db.positions.popup.x == 300)
-local optionsPage = H.find(PlayerTagsFrame, function(o) return rawget(o, "checks") ~= nil end)[1]
-check("every option fits inside the window", (function()
-	local lowest = 0
-	for _, child in ipairs(optionsPage.__children) do
-		local a = child.__points and child.__points[1]
-		if a and a.point == "TOPLEFT" and (a.rel == nil or a.rel == optionsPage) then
-			lowest = math.max(lowest, -a.y + child:GetHeight())
-		end
-	end
-	return lowest > 300 and lowest <= 520 - 46 - 12, lowest
-end)())
+-- The close button must not go through the game's panel manager, which
+-- addons may not use in combat.
+local realHide = HideUIPanel
+HideUIPanel = function() error("HideUIPanel is blocked for addons in combat") end
+world.combat = true
+H.run(PlayerTagsFrame.CloseButton, "OnClick")
+check("the close button works in combat", not PlayerTagsFrame:IsShown())
+world.combat = false
+HideUIPanel = realHide
+ns.ShowWindow()
 ns.ToggleWindow()
 check("window closes", not PlayerTagsFrame:IsShown())
 
@@ -528,6 +531,25 @@ local mini = PlayerTagsMinimapButton
 check("the button exists, is showing and belongs to the minimap", mini ~= nil and mini:IsShown() and mini:GetParent() == Minimap)
 at = H.anchor(mini)
 check("it starts at the lower left of the minimap", at.point == "CENTER" and at.rel == Minimap and math.abs(at.x + 73.54) < 0.1 and math.abs(at.y + 73.54) < 0.1, tostring(at.x) .. "," .. tostring(at.y))
+-- Another addon's button (LibDBIcon starts at the lower left too).
+local other = CreateFrame("Button", "LibDBIcon10_FishFry", Minimap)
+other:SetSize(31, 31)
+local pin = CreateFrame("Button", nil, Minimap) -- a small quest pin on the rim
+pin:SetSize(16, 16)
+pin.__center = { 1850 + math.cos(math.rad(250)) * 100, 1050 + math.sin(math.rad(250)) * 100 }
+other.__center = { 1850 + math.cos(math.rad(225)) * 104, 1050 + math.sin(math.rad(225)) * 104 }
+ns.db.positions.minimap = nil
+ns.Fire("SETTINGS_CHANGED")
+H.flush()
+local chosen = ns.db.positions.minimap
+check("a first-time button moves off a spot another addon's button uses", chosen ~= nil and math.abs((chosen - 225 + 180) % 360 - 180) >= 24, tostring(chosen))
+check("and takes the nearest free spot, then keeps it", chosen == 250 and H.anchor(mini).x ~= at.x)
+other:Hide()
+pin:Hide()
+ns.db.positions.minimap = 225
+ns.Fire("SETTINGS_CHANGED")
+H.flush()
+check("a spot that was chosen is not changed again", ns.db.positions.minimap == 225)
 H.run(mini, "OnClick", "LeftButton")
 check("left-click opens the list", PlayerTagsFrame:IsShown())
 H.run(mini, "OnClick", "LeftButton")
@@ -561,16 +583,14 @@ check("its tooltip explains the clicks", table.concat(GameTooltip.__lines, "|"):
 check("the tooltip opens right beside the button", at.point == "TOPRIGHT" and at.rel == mini and at.relPoint == "BOTTOMLEFT")
 mini.__center = nil
 H.run(mini, "OnLeave")
-ns.ShowWindow("options")
-local miniCheck = H.find(PlayerTagsFrame, function(o) return rawget(o, "key") == "minimap" end)[1]
-check("options has a switch for it, ticked", miniCheck ~= nil and miniCheck:GetChecked() == true)
-H.run(miniCheck, "OnClick")
+local miniSetting = H.settings.byVariable.PLAYERTAGS_MINIMAP
+check("settings have a switch for it, ticked", miniSetting ~= nil and miniSetting:GetValue() == true)
+miniSetting:SetValue(false)
 check("unticking it hides the button", ns.settings.minimap == false and not mini:IsShown())
-H.run(miniCheck, "OnClick")
+miniSetting:SetValue(true)
 check("ticking it brings the button back", ns.settings.minimap == true and mini:IsShown())
-local cursorCheck = H.find(PlayerTagsFrame, function(o) return rawget(o, "key") == "popupAtCursor" end)[1]
-check("options has a switch for opening the popup at the mouse, unticked", cursorCheck ~= nil and cursorCheck:GetChecked() == false)
-ns.ToggleWindow()
+local cursorSetting = H.settings.byVariable.PLAYERTAGS_POPUPATCURSOR
+check("settings have a switch for opening the popup at the mouse, unticked", cursorSetting ~= nil and cursorSetting:GetValue() == false)
 local tocText = io.open("PlayerTags/PlayerTags.toc"):read("*a")
 local listed = tocText:match("## AddonCompartmentFunc: ([%w_]+)")
 check("the game's addon list is given a function that exists", listed ~= nil and type(_G[listed]) == "function", listed)
@@ -669,6 +689,148 @@ for _, name in ipairs({ "Lark Pembrook", "Moss Tanner", "Brin Talmore", "Cael Vo
 end
 world.playerCache, world.chatGuids = nil, nil
 check("learning classes ran without problems", #ns.errors == 0, ns.errors[1])
+
+section("friendly names look like the game's own")
+-- With friendly nameplates on, the game draws friendly names white,
+-- outlined and cut to the plate's width. Ours replace them: the game's
+-- blue, its name font with a shadow, <Away>, the guild underneath.
+ns.settings.friendlyPlates = "on"
+world.cvars.UnitNameGuild = "1"
+world.units.nameplate5 = { name = "Darkchylde", surname = "Ravenshadowmere", guid = "Player-1-DARK", class = "MAGE", guild = "Hearthfire", afk = true }
+local fplate = H.plate("nameplate5")
+fplate.UnitFrame.unit = "nameplate5"
+H.fire("NAME_PLATE_UNIT_ADDED", "nameplate5")
+local gameName = fplate.UnitFrame.name
+local ourName, guildLine = fplate.UnitFrame.ptName, fplate.UnitFrame.ptGuild
+check("our name line replaces the game's, which is hidden but untouched", ourName ~= nil and ourName:IsShown() and gameName:GetAlpha() == 0 and gameName.__font == nil)
+check("it is the game's blue", math.abs(ourName.__color[1] - 96 / 255) < 0.001 and ourName.__color[3] == 1, table.concat(ourName.__color, ","))
+check("at full strength, not faded with the nameplate", ourName.__ignoreParentAlpha == true and guildLine.__ignoreParentAlpha == true)
+check("in the game's name font, with a shadow and no outline", ourName.__font[1] == UNIT_NAME_FONT and ourName.__font[3] == "" and ourName.__shadow[1] == 1)
+check("the full name, never cut short, with <Away> in front", ourName:GetText() == "<Away>Darkchylde Ravenshadowmere" and ourName.__w == nil, ourName:GetText())
+check("the guild shows underneath in the same blue", guildLine:IsShown() and guildLine:GetText() == "<Hearthfire>" and guildLine.__color[3] == 1)
+local plateRow = H.badgeRow(fplate)
+CompactUnitFrame_UpdateName(fplate.UnitFrame)
+check("after the game redraws its name, ours is still the one showing", ourName:IsShown() and gameName:GetAlpha() == 0)
+world.units.nameplate5.afk = false
+H.fire("PLAYER_FLAGS_CHANGED", "nameplate5")
+check("coming back from away drops <Away>", ourName:GetText() == "Darkchylde Ravenshadowmere", ourName:GetText())
+world.cvars.UnitNameGuild = "0"
+ns.Fire("SETTINGS_CHANGED")
+check("with the game's guild names off, no guild line", not guildLine:IsShown())
+world.cvars.UnitNameGuild = "1"
+H.settings.byVariable.PLAYERTAGS_FRIENDLYNAMECOLOR:SetValue("class")
+check("class colours can be chosen instead", ourName.__color[1] == RAID_CLASS_COLORS.MAGE.r and ourName.__color[3] == RAID_CLASS_COLORS.MAGE.b)
+H.settings.byVariable.PLAYERTAGS_FRIENDLYNAMECOLOR:SetValue("white")
+check("or plain white", ourName.__color[1] == 1 and ourName.__color[2] == 1)
+H.settings.byVariable.PLAYERTAGS_FRIENDLYNAMECOLOR:SetValue("game")
+local normal = ourName.__font[2]
+H.settings.byVariable.PLAYERTAGS_FRIENDLYNAMESIZE:SetValue(1.3)
+check("the size setting makes the names bigger", math.abs(ourName.__font[2] - normal * 1.3) < 0.01 and math.abs(guildLine.__font[2] - normal * 1.3) < 0.01, ourName.__font[2])
+H.settings.byVariable.PLAYERTAGS_FRIENDLYNAMESIZE:SetValue(1)
+world.units.nameplate6 = { name = "Grukk", guid = "Player-1-GRUKK", class = "WARRIOR", hostile = true }
+local eplate = H.plate("nameplate6")
+eplate.UnitFrame.unit = "nameplate6"
+H.fire("NAME_PLATE_UNIT_ADDED", "nameplate6")
+check("enemy players' names are left as the game draws them", eplate.UnitFrame.ptName == nil and eplate.UnitFrame.name:GetAlpha() == 1)
+ns.settings.friendlyPlates = "off"
+ns.Fire("SETTINGS_CHANGED")
+check("turning friendly nameplates off brings the game's own name back", gameName:GetAlpha() == 1 and not ourName:IsShown() and not guildLine:IsShown())
+H.fire("NAME_PLATE_UNIT_REMOVED", "nameplate5")
+H.fire("NAME_PLATE_UNIT_REMOVED", "nameplate6")
+world.units.nameplate5, world.units.nameplate6 = nil, nil
+check("friendly names ran without problems", #ns.errors == 0, ns.errors[1])
+
+section("the game's settings page")
+local page = H.settings.categories[1]
+check("Player Tags has a page in the game's Settings, under AddOns", page ~= nil and page.name == "Player Tags" and page.registered == true)
+check("every setting is on it", (function()
+	for _, key in ipairs({ "tooltip", "chat", "frames", "finder", "nameplates", "platesize", "platemax", "friendlyplates", "friendlynamecolor", "friendlynamesize",
+		"groupalert", "alertsound", "scale", "compactpopup", "popupatcursor", "menu", "minimap" }) do
+		if not H.settings.byVariable["PLAYERTAGS_" .. key:upper()] then return false, key end
+	end
+	return true
+end)())
+check("every label fits the Settings panel's label column", (function()
+	for _, setting in pairs(H.settings.byVariable) do
+		if #setting.name > 27 then return false, setting.name end
+	end
+	return true
+end)())
+check("every option has an explanation", (function()
+	for _, row in ipairs(H.settings.rows) do
+		if row.control and not ns.IsText(row.tooltip) then return false end
+	end
+	return true
+end)())
+local heard = 0
+ns.Listen("SETTINGS_CHANGED", function() heard = heard + 1 end, "test")
+H.settings.byVariable.PLAYERTAGS_CHAT:SetValue(false)
+check("a change is saved and announced", ns.settings.chat == false and heard > 0)
+H.settings.byVariable.PLAYERTAGS_CHAT:SetValue(true)
+check("friendly nameplates keep their on/off form", H.settings.byVariable.PLAYERTAGS_FRIENDLYPLATES:GetValue() == (ns.settings.friendlyPlates == "on"), tostring(ns.settings.friendlyPlates))
+local plates = H.settings.byVariable.PLAYERTAGS_FRIENDLYPLATES
+local platesBefore = ns.settings.friendlyPlates
+plates:SetValue(false)
+local offForm = ns.settings.friendlyPlates
+plates:SetValue(true)
+check("ticking and unticking it stores on and off", offForm == "off" and ns.settings.friendlyPlates == "on")
+plates:SetValue(platesBefore == "on")
+H.settings.byVariable.PLAYERTAGS_PLATESIZE:SetValue(21)
+check("nameplate icon size is a choice of sizes", ns.settings.plateSize == 21)
+H.settings.byVariable.PLAYERTAGS_PLATESIZE:SetValue(17)
+check("the Avoid sound keeps its old default", ns.defaults.alertSound == true)
+local openRow
+for _, row in ipairs(H.settings.rows) do if row.control == "button" and row.text == "Open" then openRow = row end end
+ns.ShowWindow("tags")
+ns.ToggleWindow()
+openRow.click()
+check("Players you've tagged opens the Players tab, not the last one used", PlayerTagsFrame:IsShown() and PlayerTagsFrame.selectedTab == 1, PlayerTagsFrame.selectedTab)
+ns.ShowWindow("tags")
+ns.ShowWindow()
+check("so does opening the list while it shows the Tags tab", PlayerTagsFrame.selectedTab == 1)
+ns.ToggleWindow()
+local moveRow
+for _, row in ipairs(H.settings.rows) do if row.control == "button" and row.text == "Move" then moveRow = row end end
+check("the alert box can be moved from settings", moveRow ~= nil)
+moveRow.click()
+check("Move shows the box with a Done button", ns.IsAlertShown() and PlayerTagsAlert.done:IsShown())
+H.drag(PlayerTagsAlert, 1000, 900)
+check("where it is dropped is remembered", ns.db.positions.alert and ns.db.positions.alert.y == 300, ns.db.positions.alert and ns.db.positions.alert.y)
+H.run(PlayerTagsAlert.done, "OnClick")
+check("Done puts it away", not ns.IsAlertShown())
+
+H.settings.opened = nil
+SlashCmdList.PLAYERTAGS("options")
+check("/tags options opens the settings page", H.settings.opened == page.id)
+H.settings.opened = nil
+world.chat = {}
+world.combat = true
+SlashCmdList.PLAYERTAGS("options")
+check("in combat it says why it can't open", H.settings.opened == nil and chatHas("during combat"))
+world.combat = false
+ns.ShowWindow()
+local settingsButton = H.find(PlayerTagsFrame, function(o) return o:GetText() == "Settings" and o.__kind == "Button" end)[1]
+H.run(settingsButton, "OnClick")
+check("the list's Settings button opens it too", H.settings.opened == page.id)
+ns.ToggleWindow()
+
+H.settings.byVariable.PLAYERTAGS_SCALE:SetValue(1.2)
+ns.ShowWindow()
+check("window size applies to the list", PlayerTagsFrame:GetScale() == 1.2, PlayerTagsFrame:GetScale())
+world.units.target = TESSA
+PlayerTags_QuickTag()
+check("and to the tagging popup", PlayerTagsPopup:GetScale() == 1.2)
+local fullWidth = PlayerTagsPopup:GetWidth()
+H.settings.byVariable.PLAYERTAGS_COMPACTPOPUP:SetValue(true)
+local compactButtons = H.find(PlayerTagsPopup, function(o) return rawget(o, "tagId") ~= nil and o:IsShown() end)
+check("the compact popup is narrower and shows icons only", PlayerTagsPopup:GetWidth() < fullWidth and not compactButtons[1].text:IsShown(), PlayerTagsPopup:GetWidth())
+H.settings.byVariable.PLAYERTAGS_COMPACTPOPUP:SetValue(false)
+check("back to full size with names", PlayerTagsPopup:GetWidth() == fullWidth and compactButtons[1].text:IsShown())
+check("the popup's title is the player's name and its portrait is them", PlayerTagsPopup.who:GetText():find("Tessa Brightwell", 1, true) ~= nil and PlayerTagsPopup.__portrait == "unit:target")
+PlayerTags_QuickTag()
+H.settings.byVariable.PLAYERTAGS_SCALE:SetValue(1)
+ns.ToggleWindow()
+check("settings ran without problems", #ns.errors == 0, ns.errors[1])
 
 section("saved data stays clean")
 local function plain(value, path)

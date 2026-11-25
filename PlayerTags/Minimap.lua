@@ -33,6 +33,55 @@ local function place()
 	button:SetPoint("CENTER", Minimap, "CENTER", x * reach, y * reach)
 end
 
+---------------------------------------------------------------------------
+-- A free spot. Most addons' minimap buttons (LibDBIcon) also start at the
+-- lower left, and the last one made covers the rest. So the first time,
+-- the button takes the nearest spot on the rim that nobody else uses, and
+-- keeps it. Dragging it anywhere still works as before.
+---------------------------------------------------------------------------
+local CANDIDATES = { 225, 250, 200, 270, 180, 290, 160, 310, 140, 330, 120, 350, 100, 10, 80, 30, 60 }
+local SPACING = 24 -- degrees between two buttons' centres so they don't overlap
+
+--- Angles of the other buttons sitting on the minimap's rim.
+local function takenAngles()
+	local taken = {}
+	local mx, my = Minimap:GetCenter()
+	if not (mx and my) then return taken end
+	local radius = (Minimap:GetWidth() or 140) / 2
+	for _, child in ipairs({ Minimap:GetChildren() }) do
+		-- Only button-sized things count. The game also puts small pins on
+		-- the rim (quest arrows and the like) that come and go.
+		local width = child.GetWidth and child:GetWidth() or 0
+		if child ~= button and child.IsShown and child:IsShown() and width >= 26 and width <= 40
+			and child.GetObjectType and child:GetObjectType() == "Button" then
+			local cx, cy = child:GetCenter()
+			if cx and cy then
+				local dx, dy = cx - mx, cy - my
+				local distance = math.sqrt(dx * dx + dy * dy)
+				if distance > radius - 15 and distance < radius + 30 then
+					taken[#taken + 1] = math.deg(math.atan2(dy, dx)) % 360
+				end
+			end
+		end
+	end
+	return taken
+end
+
+local function freeAngle()
+	local taken = takenAngles()
+	for _, angle in ipairs(CANDIDATES) do
+		local clear = true
+		for _, other in ipairs(taken) do
+			if math.abs((angle - other + 180) % 360 - 180) < SPACING then
+				clear = false
+				break
+			end
+		end
+		if clear then return angle end
+	end
+	return DEFAULT_ANGLE
+end
+
 --- Follows the mouse around the minimap while the button is being dragged.
 local function follow()
 	local mx, my = Minimap:GetCenter()
@@ -120,6 +169,15 @@ local function apply()
 		if not button then build() end
 		place()
 		button:Show()
+		-- Other addons make their buttons around login too; look once
+		-- they are all there.
+		if ns.db.positions.minimap == nil then
+			C_Timer.After(2, function()
+				if ns.db.positions.minimap ~= nil or not button then return end
+				ns.db.positions.minimap = freeAngle()
+				place()
+			end)
+		end
 	elseif button then
 		button:Hide()
 	end

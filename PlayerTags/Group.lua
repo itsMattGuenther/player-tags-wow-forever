@@ -32,10 +32,14 @@ local function announce(list)
 		end
 	end
 
-	local banner = _G.UIErrorsFrame
-	if banner and banner.AddMessage then
-		banner:AddMessage("Player Tags: " .. summary, 1, 0.82, 0)
+	-- The alert box, not the game's error-message area: that is where
+	-- "Not enough mana" shows, and a heads-up there is easy to miss.
+	local rows = {}
+	for _, rec in ipairs(list) do
+		local ids = ns.TagIds(rec)
+		rows[#rows + 1] = { ids = ids, text = ns.ColoredName(rec) .. "  |cffa7afb8" .. ns.TagNames(ids) .. "|r" }
 	end
+	if ns.ShowAlert then ns.ShowAlert(summary, rows) end
 	if warn and ns.settings.alertSound and PlaySound and _G.SOUNDKIT and _G.SOUNDKIT.RAID_WARNING then
 		pcall(PlaySound, _G.SOUNDKIT.RAID_WARNING)
 	end

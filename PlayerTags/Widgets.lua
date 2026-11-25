@@ -1,56 +1,28 @@
--- Widgets: a small, self-drawn UI kit. Drawing our own panels and buttons
--- keeps the addon independent of Blizzard templates that change between
--- client versions.
+-- Widgets: the addon's windows are built from the game's own templates, so
+-- they look like every other Blizzard window: the standard frame with its
+-- portrait and close button, red buttons, check boxes, search box and tabs
+-- along the bottom. Only the tag icons are our own drawing.
+--
+-- Rules that keep these templates out of trouble during combat:
+--   * windows close with :Hide(), never the game's panel manager
+--     (HideUIPanel), which addons may not call in combat;
+--   * nothing here is registered with UIPanelWindows.
 local _, ns = ...
 
 local UI = {}
 ns.UI = UI
 
-local LINE = { 0.17, 0.20, 0.25 }
-local GOLD = { 1, 0.82, 0 }
+local HIGHLIGHT_SQUARE = "Interface\\Buttons\\ButtonHilight-Square"
+local CHECKED_SQUARE = "Interface\\Buttons\\CheckButtonHilight"
+local ROW_HIGHLIGHT = "Interface\\QuestFrame\\UI-QuestTitleHighlight"
+local ICON = "Interface\\AddOns\\PlayerTags\\Media\\icon"
 
-function UI.Fill(frame, r, g, b, a)
-	local bg = frame:CreateTexture(nil, "BACKGROUND")
-	bg:SetAllPoints()
-	bg:SetColorTexture(r, g, b, a or 1)
-	frame.fill = bg
-	return bg
-end
-
-function UI.Edges(frame, r, g, b, a)
-	local e = {}
-	for i = 1, 4 do
-		e[i] = frame:CreateTexture(nil, "BORDER")
-		e[i]:SetColorTexture(r, g, b, a or 1)
-	end
-	e[1]:SetPoint("TOPLEFT")
-	e[1]:SetPoint("TOPRIGHT")
-	e[1]:SetHeight(1)
-	e[2]:SetPoint("BOTTOMLEFT")
-	e[2]:SetPoint("BOTTOMRIGHT")
-	e[2]:SetHeight(1)
-	e[3]:SetPoint("TOPLEFT")
-	e[3]:SetPoint("BOTTOMLEFT")
-	e[3]:SetWidth(1)
-	e[4]:SetPoint("TOPRIGHT")
-	e[4]:SetPoint("BOTTOMRIGHT")
-	e[4]:SetWidth(1)
-	frame.edges = e
-	function frame:SetEdgeColor(nr, ng, nb, na)
-		for i = 1, 4 do self.edges[i]:SetColorTexture(nr, ng, nb, na or 1) end
-	end
-	return e
-end
-
---- A dark panel with a thin border. Swallows clicks so they do not fall
---- through to the game world.
-function UI.Panel(name, parent)
-	local f = CreateFrame("Frame", name, parent or UIParent)
-	UI.Fill(f, 0.047, 0.063, 0.086, 0.97)
-	UI.Edges(f, LINE[1], LINE[2], LINE[3], 1)
-	f:EnableMouse(true)
-	return f
-end
+-- The bar of buttons along the bottom of a window. The template's own bar
+-- is 26 high, which puts 22-high buttons on top of the gold border; ours
+-- is a little taller, so buttons sit in it with room above and below.
+UI.BAR = 34      -- height of the bar under the inset
+UI.BAR_Y = 7     -- where a 22-high button sits, from the window's bottom
+UI.BAR_TEXT_Y = 13 -- where a line of small text sits, level with the buttons
 
 function UI.Text(parent, font, text)
 	local fs = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlightSmall")
@@ -72,147 +44,243 @@ end
 
 UI.ShowTip, UI.HideTip = showTip, hideTip
 
-function UI.Button(parent, text, width, height)
-	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(width or 80, height or 22)
-	UI.Fill(b, 0.078, 0.098, 0.133, 1)
-	UI.Edges(b, LINE[1], LINE[2], LINE[3], 1)
-	b.label = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.label:SetPoint("CENTER")
-	b.label:SetText(text or "")
-	b.on = false
-
-	function b:Paint(hover)
-		if self.on then
-			self:SetEdgeColor(GOLD[1], GOLD[2], GOLD[3], 1)
-			self.label:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
-		elseif hover then
-			self:SetEdgeColor(0.60, 0.65, 0.70, 1)
-			self.label:SetTextColor(1, 1, 1)
-		else
-			self:SetEdgeColor(LINE[1], LINE[2], LINE[3], 1)
-			self.label:SetTextColor(0.85, 0.87, 0.90)
-		end
+--- Scales one of our windows by the "Window size" setting.
+function UI.ApplyScale(frame)
+	if frame and frame.SetScale then
+		local scale = ns.settings and tonumber(ns.settings.scale) or 1
+		if scale < 0.5 or scale > 1.5 then scale = 1 end
+		frame:SetScale(scale)
 	end
+end
 
-	--- Marks the button as the selected one of a group.
+--- The game's standard window: rock background, gold title, round portrait
+--- top left, red close button, an inset for content and a bar of buttons
+--- along the bottom. `portrait` false hides the portrait.
+function UI.Window(name, title, width, height, portrait)
+	local f = CreateFrame("Frame", name, UIParent, "ButtonFrameTemplate")
+	f:SetSize(width, height)
+	f:SetTitle(title or "")
+	if portrait == false then
+		ButtonFrameTemplate_HidePortrait(f)
+	else
+		f:SetPortraitToAsset(ICON)
+	end
+	f.Inset:ClearAllPoints()
+	f.Inset:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -60)
+	f.Inset:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -6, UI.BAR)
+	f:EnableMouse(true)
+	f:SetFrameStrata("HIGH")
+	f:SetToplevel(true)
+	-- The template's close button goes through the game's panel manager,
+	-- which is blocked for addons in combat. Hide the window directly.
+	f.CloseButton:SetScript("OnClick", function(self) self:GetParent():Hide() end)
+	UI.ApplyScale(f)
+	return f
+end
+
+--- A red game button. `tip` on the button shows the game's tooltip.
+function UI.Button(parent, text, width, height, small)
+	local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+	b:SetSize(width or 80, height or 22)
+	if small then
+		b:SetNormalFontObject("GameFontNormalSmall")
+		b:SetHighlightFontObject("GameFontHighlightSmall")
+		b:SetDisabledFontObject("GameFontDisableSmall")
+	end
+	b:SetText(text or "")
+	b:HookScript("OnEnter", showTip)
+	b:HookScript("OnLeave", hideTip)
+
+	--- Marks the button as the chosen one of a group, the way the game
+	--- shows a pressed filter: the highlight stays lit.
 	function b:SetOn(on)
 		self.on = on and true or false
-		self:Paint(false)
+		if self.on then self:LockHighlight() else self:UnlockHighlight() end
 	end
 
 	function b:SetLabel(newText)
-		self.label:SetText(newText)
+		self:SetText(newText)
 	end
 
-	b:SetScript("OnEnter", function(self)
-		self:Paint(true)
-		showTip(self)
-	end)
-	b:SetScript("OnLeave", function(self)
-		self:Paint(false)
-		hideTip(self)
-	end)
-	b:Paint(false)
 	return b
 end
 
---- A checkbox with a label. `help` adds a dim second line that is always
---- visible, for options that need a word of explanation. (A hover tooltip
---- here would float over whatever sits beside the option.)
+--- The game's check box with a label. `help` adds a second, dim line that
+--- is always visible, for options that need a word of explanation.
 function UI.Check(parent, text, help)
-	local c = CreateFrame("Button", nil, parent)
-
-	c.box = CreateFrame("Frame", nil, c)
-	c.box:SetSize(14, 14)
-	c.box:SetPoint("TOPLEFT", 0, -3)
-	UI.Fill(c.box, 0.03, 0.04, 0.055, 1)
-	UI.Edges(c.box, 0.35, 0.40, 0.46, 1)
-
-	c.mark = c.box:CreateTexture(nil, "ARTWORK")
-	c.mark:SetPoint("TOPLEFT", 3, -3)
-	c.mark:SetPoint("BOTTOMRIGHT", -3, 3)
-	c.mark:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 1)
-
-	c.label = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	c.label:SetPoint("LEFT", c.box, "RIGHT", 8, 0)
-	c.label:SetJustifyH("LEFT")
-	c.label:SetText(text or "")
-
-	local width, height = c.label:GetStringWidth() or 0, 20
+	local c = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+	c:SetSize(26, 26)
+	c.Text:ClearAllPoints()
+	c.Text:SetPoint("LEFT", c, "RIGHT", 2, 1)
+	c.Text:SetFontObject("GameFontHighlight")
+	c.Text:SetText(text or "")
 	if help then
 		c.help = c:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-		c.help:SetPoint("TOPLEFT", c.label, "BOTTOMLEFT", 0, -3)
+		c.help:SetPoint("TOPLEFT", c.Text, "BOTTOMLEFT", 0, -3)
 		c.help:SetJustifyH("LEFT")
 		c.help:SetText(help)
-		width = math.max(width, c.help:GetStringWidth() or 0)
-		height = 36
 	end
-	-- Only the box and its text are clickable, not the empty space beside them.
-	c:SetSize(22 + width + 4, height)
-	c.checked = false
-
-	function c:SetChecked(value)
-		self.checked = value and true or false
-		if self.checked then self.mark:Show() else self.mark:Hide() end
-	end
-
-	function c:GetChecked()
-		return self.checked
-	end
-
 	c:SetScript("OnClick", function(self)
-		self:SetChecked(not self.checked)
-		if self.onChange then self.onChange(self.checked) end
+		UI.Click()
+		if self.onChange then self.onChange(self:GetChecked() and true or false) end
 	end)
-	c:SetChecked(false)
 	return c
 end
 
+--- The game's round radio button with a label.
+function UI.Radio(parent, text)
+	local r = CreateFrame("CheckButton", nil, parent, "UIRadioButtonTemplate")
+	r.text:SetFontObject("GameFontHighlightSmall")
+	r.text:SetText(text or "")
+	return r
+end
+
+--- The game's text box. `placeholder` is the grey hint shown while empty.
+--- onChange runs for typing; onEnter and onBlur when editing ends.
 function UI.Edit(parent, width, height, placeholder)
-	local e = CreateFrame("EditBox", nil, parent)
-	e:SetSize(width, height or 22)
+	local e = CreateFrame("EditBox", nil, parent, "InputBoxInstructionsTemplate")
+	e:SetSize(width, height or 20)
 	e:SetAutoFocus(false)
-	e:SetFontObject(GameFontHighlightSmall)
-	e:SetTextInsets(6, 6, 0, 0)
+	e:SetFontObject("ChatFontNormal")
 	e:SetMaxLetters(200)
-	UI.Fill(e, 0.03, 0.04, 0.055, 1)
-	UI.Edges(e, LINE[1], LINE[2], LINE[3], 1)
-
-	e.hint = e:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	e.hint:SetPoint("LEFT", 7, 0)
-	e.hint:SetText(placeholder or "")
-
-	function e:Refresh()
-		if self:GetText() == "" and not self:HasFocus() then self.hint:Show() else self.hint:Hide() end
-	end
-
-	e:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	e.Instructions:SetText(placeholder or "")
+	e:HookScript("OnTextChanged", function(self, userInput)
+		if userInput and self.onChange then self.onChange(self) end
+	end)
 	e:SetScript("OnEnterPressed", function(self)
 		if self.onEnter then self.onEnter(self) end
 		self:ClearFocus()
 	end)
-	e:SetScript("OnEditFocusGained", function(self)
-		self:SetEdgeColor(GOLD[1], GOLD[2], GOLD[3], 1)
-		self:Refresh()
-	end)
-	e:SetScript("OnEditFocusLost", function(self)
-		self:SetEdgeColor(LINE[1], LINE[2], LINE[3], 1)
-		self:Refresh()
+	e:HookScript("OnEditFocusLost", function(self)
 		if self.onBlur then self.onBlur(self) end
 	end)
-	e:SetScript("OnTextChanged", function(self, userInput)
-		self:Refresh()
-		if userInput and self.onChange then self.onChange(self) end
-	end)
-	e:Refresh()
+	--- Kept for callers that set text and want the hint redrawn; the
+	--- template redraws it on every change by itself.
+	function e:Refresh()
+		if self.Instructions then self.Instructions:SetShown(self:GetText() == "") end
+	end
 	return e
 end
 
+--- The game's search box: magnifying glass, grey hint, clear button.
+--- onChange runs whenever the text changes, typed or cleared.
+function UI.Search(parent, width, placeholder)
+	local e = CreateFrame("EditBox", nil, parent, "SearchBoxTemplate")
+	e:SetSize(width, 20)
+	e:SetAutoFocus(false)
+	e:SetMaxLetters(60)
+	e.Instructions:SetText(placeholder or SEARCH or "Search")
+	local last = ""
+	e:HookScript("OnTextChanged", function(self)
+		local text = self:GetText() or ""
+		if text == last then return end
+		last = text
+		if self.onChange then self.onChange(self) end
+	end)
+	function e:Refresh()
+		last = self:GetText() or ""
+		if self.Instructions then self.Instructions:SetShown(last == "") end
+	end
+	return e
+end
+
+--- Tabs along the bottom of a window, as on the character and spellbook
+--- windows. onSelect(id) runs when one is clicked.
+function UI.Tabs(frame, list, onSelect)
+	local tabs = {}
+	for i, item in ipairs(list) do
+		local name = frame:GetName() and (frame:GetName() .. "Tab" .. i) or nil
+		local tab = CreateFrame("Button", name, frame, "PanelTabButtonTemplate")
+		tab:SetID(i)
+		tab:SetText(item.label)
+		if i == 1 then
+			tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 12, 2)
+		else
+			tab:SetPoint("TOPLEFT", tabs[i - 1], "TOPRIGHT", 3, 0)
+		end
+		tab:SetScript("OnClick", function()
+			UI.Click()
+			onSelect(item.id)
+		end)
+		tab.tabId = item.id
+		PanelTemplates_TabResize(tab, 0)
+		tabs[i] = tab
+	end
+	PanelTemplates_SetNumTabs(frame, #tabs)
+
+	--- Shows which tab is chosen.
+	function frame:SelectTabId(id)
+		for i, tab in ipairs(tabs) do
+			if tab.tabId == id then PanelTemplates_SetTab(self, i) end
+		end
+	end
+	return tabs
+end
+
+--- A clickable row in a list, lit the way the quest log and friends list
+--- light theirs: a soft band on hover, the same band held when chosen.
+function UI.Row(parent, height)
+	local row = CreateFrame("Button", nil, parent)
+	row:SetHeight(height)
+	row:SetHighlightTexture(ROW_HIGHLIGHT, "ADD")
+	function row:SetOn(on)
+		self.on = on and true or false
+		if self.on then self:LockHighlight() else self:UnlockHighlight() end
+	end
+	return row
+end
+
+--- A square icon button that can be on or off, like an action button:
+--- the game's square highlight on hover and its gold glow when on.
+--- Holds one tag badge; `label` adds the tag's name underneath.
+function UI.IconToggle(parent, size, label)
+	local b = CreateFrame("CheckButton", nil, parent)
+	b.badge = ns.CreateBadge(b, size)
+	b.badge:SetPoint("TOP", 0, 0)
+	-- The badge is a child frame, so it draws over the button's own
+	-- textures. The hover square and the glow sit on a frame above it.
+	local over = CreateFrame("Frame", nil, b)
+	over:SetAllPoints(b.badge)
+	over:SetFrameLevel((b.badge:GetFrameLevel() or 1) + 2)
+	local hl = over:CreateTexture(nil, "ARTWORK")
+	hl:SetTexture(HIGHLIGHT_SQUARE)
+	hl:SetBlendMode("ADD")
+	hl:SetAllPoints()
+	hl:Hide()
+	local glow = over:CreateTexture(nil, "OVERLAY")
+	glow:SetTexture(CHECKED_SQUARE)
+	glow:SetBlendMode("ADD")
+	glow:SetAllPoints()
+	glow:Hide()
+	b.hover, b.glow = hl, glow
+	b:HookScript("OnEnter", function(self) self.hover:Show() end)
+	b:HookScript("OnLeave", function(self) self.hover:Hide() end)
+	if label then
+		b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		b.text:SetPoint("TOP", b.badge, "BOTTOM", 0, -3)
+		b.text:SetJustifyH("CENTER")
+		b.text:SetJustifyV("TOP")
+		b.text:SetWordWrap(true)
+		if b.text.SetMaxLines then b.text:SetMaxLines(2) end
+	end
+	--- On shows the badge bright with the glow; off shows it dimmed.
+	function b:SetOn(on)
+		self.on = on and true or false
+		self:SetChecked(self.on)
+		self.glow:SetShown(self.on)
+		self.badge:SetDim(not self.on)
+		if self.text then
+			if self.on then self.text:SetTextColor(1, 1, 1) else self.text:SetTextColor(0.62, 0.62, 0.62) end
+		end
+	end
+	return b
+end
+
 ---------------------------------------------------------------------------
--- Window positions. A window opens in the middle of the screen until it has
--- been dragged; after that it opens where it was left. A position is kept as
--- the distance of the window's centre from the centre of the screen.
+-- Window positions. A window opens at its default spot (the middle of the
+-- screen unless the caller gives another) until it has been dragged; after
+-- that it opens where it was left. A position is kept as the distance of
+-- the window's centre from the centre of the screen.
 ---------------------------------------------------------------------------
 
 --- The game keeps its own record of where dragged windows were and can put
@@ -221,10 +289,10 @@ local function placedByUs(frame)
 	if frame.SetUserPlaced then pcall(frame.SetUserPlaced, frame, false) end
 end
 
---- Puts a window at its remembered spot, or dead centre when it has none.
-function UI.Place(frame, key)
+--- Puts a window at its remembered spot, or at its default.
+function UI.Place(frame, key, defaultX, defaultY)
 	local saved = key and ns.db and ns.db.positions and ns.db.positions[key]
-	local x, y = 0, 0
+	local x, y = defaultX or 0, defaultY or 0
 	if type(saved) == "table" and type(saved.x) == "number" and type(saved.y) == "number" then
 		x, y = saved.x, saved.y
 	end
@@ -234,7 +302,7 @@ end
 
 --- Lets a window be dragged. With a key, where it is dropped is remembered
 --- and used by UI.Place from then on.
-function UI.Movable(frame, key)
+function UI.Movable(frame, key, defaultX, defaultY)
 	frame:SetMovable(true)
 	frame:SetClampedToScreen(true)
 	frame:RegisterForDrag("LeftButton")
@@ -252,7 +320,7 @@ function UI.Movable(frame, key)
 			x = math.floor((x - cx * ratio) * 10 + 0.5) / 10,
 			y = math.floor((y - cy * ratio) * 10 + 0.5) / 10,
 		}
-		UI.Place(self, key)
+		UI.Place(self, key, defaultX, defaultY)
 	end)
 	placedByUs(frame)
 end

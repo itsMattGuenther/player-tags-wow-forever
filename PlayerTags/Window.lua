@@ -1,13 +1,16 @@
--- Window: the main window (/tags). Three tabs: Players, Tags, Options.
+-- Window: the main window (/tags), in the game's standard frame. Two tabs
+-- along the bottom: Players and Tags. Settings live in the game's own
+-- Settings panel (Settings.lua); the Settings button here opens it.
 -- Also the export/import dialog.
 local _, ns = ...
 local UI = ns.UI
 
-local W, H = 740, 520
-local TOP = 46 -- height of the title and tab strip
+local W, H = 800, 548
+-- The standard frame's inset starts 60 below the top (the title and the
+-- strip beside the portrait) and stops UI.BAR above the bottom.
 
 local frame
-local pages, tabButtons = {}, {}
+local pages = {}
 local currentTab = "players"
 local refreshers = {}
 
@@ -20,7 +23,7 @@ end
 ---------------------------------------------------------------------------
 -- Players tab
 ---------------------------------------------------------------------------
-local ROW_H, VISIBLE, LIST_TOP = 26, 14, 66
+local ROW_H, VISIBLE, LIST_TOP = 26, 15, 24
 local players = { rows = {}, list = {}, offset = 0, search = "", family = nil, sort = "seen", confirm = nil }
 
 local function buildPlayerList()
@@ -69,6 +72,12 @@ local function learnMissing()
 	return changed
 end
 
+local function seenText(rec)
+	local seen = ns.Ago(rec.seen or rec.created)
+	if ns.IsText(rec.seenZone) then seen = seen .. ", " .. rec.seenZone end
+	return seen
+end
+
 local function refreshPlayers()
 	local page = pages.players
 	if not page then return end
@@ -84,13 +93,11 @@ local function refreshPlayers()
 			row.key = item.key
 			row.name:SetText(ns.ColoredName(rec, item.key))
 			row.tags:SetTags(item.ids, 6)
-			local seen = ns.Ago(rec.seen or rec.created)
-			if ns.IsText(rec.seenZone) then seen = seen .. ", " .. rec.seenZone end
-			row.seen:SetText(seen)
+			row.seen:SetText(seenText(rec))
 			row.note:SetText(rec.note or "")
 			local confirming = players.confirm == item.key
-			row.del:SetLabel(confirming and "Sure?" or "x")
-			row.del:SetWidth(confirming and 46 or 20)
+			row.del:SetLabel(confirming and "Sure?" or "Remove")
+			if confirming or row:IsMouseOver() then row.del:Show() else row.del:Hide() end
 			row:Show()
 		else
 			row.key = nil
@@ -118,7 +125,7 @@ local function refreshPlayers()
 		local y = (track - height) * (players.offset / (total - VISIBLE))
 		page.thumb:SetHeight(height)
 		page.thumb:ClearAllPoints()
-		page.thumb:SetPoint("TOPRIGHT", page, "TOPRIGHT", -6, -(LIST_TOP + y))
+		page.thumb:SetPoint("TOPRIGHT", frame.Inset, "TOPRIGHT", -3, -(LIST_TOP + y))
 		page.thumb:Show()
 	else
 		page.thumb:Hide()
@@ -129,44 +136,46 @@ local function refreshPlayers()
 	page.sortSeen:SetOn(players.sort == "seen")
 end
 
+-- The full last-seen text and note, for rows where they are cut short.
+local function rowTip(row)
+	local rec = row.key and ns.GetRecord(row.key)
+	if not rec then return end
+	if not (row.seen:IsTruncated() or row.note:IsTruncated()) then return end
+	GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+	GameTooltip:SetText(ns.ColoredName(rec, row.key))
+	GameTooltip:AddLine("Last seen " .. seenText(rec), 0.8, 0.8, 0.8, true)
+	if ns.IsText(rec.note) then GameTooltip:AddLine("\"" .. rec.note .. "\"", 1, 1, 1, true) end
+	GameTooltip:Show()
+end
+
 local function makePlayerRow(page, index)
-	local row = CreateFrame("Button", nil, page)
-	row:SetHeight(ROW_H)
-	row:SetPoint("TOPLEFT", page, "TOPLEFT", 8, -(LIST_TOP + (index - 1) * ROW_H))
-	row:SetPoint("RIGHT", page, "RIGHT", -16, 0)
+	local inset = frame.Inset
+	local row = UI.Row(page, ROW_H)
+	row:SetPoint("TOPLEFT", inset, "TOPLEFT", 6, -(LIST_TOP + (index - 1) * ROW_H))
+	row:SetPoint("RIGHT", inset, "RIGHT", -12, 0)
 
-	row.hover = row:CreateTexture(nil, "BACKGROUND")
-	row.hover:SetAllPoints()
-	row.hover:SetColorTexture(1, 1, 1, 0.06)
-	row.hover:Hide()
-
-	local line = row:CreateTexture(nil, "BORDER")
-	line:SetPoint("BOTTOMLEFT")
-	line:SetPoint("BOTTOMRIGHT")
-	line:SetHeight(1)
-	line:SetColorTexture(0.11, 0.14, 0.18, 1)
-
-	row.name = UI.Text(row, "GameFontHighlightSmall")
+	row.name = UI.Text(row, "GameFontHighlight")
 	row.name:SetPoint("LEFT", row, "LEFT", 6, 0)
-	row.name:SetWidth(168)
+	row.name:SetWidth(170)
 	row.name:SetWordWrap(false)
 
 	row.tags = ns.CreateBadgeRow(row, 16, 2)
-	row.tags:SetPoint("LEFT", row, "LEFT", 182, 0)
+	row.tags:SetPoint("LEFT", row, "LEFT", 184, 0)
 
 	row.seen = UI.Text(row, "GameFontHighlightSmall")
-	row.seen:SetPoint("LEFT", row, "LEFT", 322, 0)
-	row.seen:SetWidth(150)
+	row.seen:SetPoint("LEFT", row, "LEFT", 330, 0)
+	row.seen:SetWidth(186)
 	row.seen:SetWordWrap(false)
 
 	row.note = UI.Text(row, "GameFontDisableSmall")
-	row.note:SetPoint("LEFT", row, "LEFT", 480, 0)
-	row.note:SetPoint("RIGHT", row, "RIGHT", -56, 0)
+	row.note:SetPoint("LEFT", row, "LEFT", 524, 0)
+	row.note:SetPoint("RIGHT", row, "RIGHT", -74, 0)
 	row.note:SetWordWrap(false)
 
-	row.del = UI.Button(row, "x", 20, 18)
+	row.del = UI.Button(row, "Remove", 64, 20, true)
 	row.del:SetPoint("RIGHT", row, "RIGHT", -4, 0)
 	row.del.tip = "Remove this player and their tags"
+	row.del:Hide()
 	row.del:SetScript("OnClick", function()
 		if not row.key then return end
 		if players.confirm == row.key then
@@ -177,9 +186,19 @@ local function makePlayerRow(page, index)
 			refreshPlayers()
 		end
 	end)
+	-- The Remove button shows while the pointer is on the row.
+	row.del:HookScript("OnLeave", function()
+		if not row:IsMouseOver() and players.confirm ~= row.key then row.del:Hide() end
+	end)
 
-	row:SetScript("OnEnter", function(self) self.hover:Show() end)
-	row:SetScript("OnLeave", function(self) self.hover:Hide() end)
+	row:SetScript("OnEnter", function(self)
+		self.del:Show()
+		rowTip(self)
+	end)
+	row:SetScript("OnLeave", function(self)
+		GameTooltip:Hide()
+		if not self.del:IsMouseOver() and players.confirm ~= self.key then self.del:Hide() end
+	end)
 	row:SetScript("OnClick", function(self)
 		local rec = self.key and ns.GetRecord(self.key)
 		if not rec then return end
@@ -194,9 +213,36 @@ local function makePlayerRow(page, index)
 	return row
 end
 
+-- A column heading. Headings that sort the list light up when chosen.
+local function header(page, label, x, sort)
+	local b = CreateFrame("Button", nil, page)
+	b:SetSize(8 + #label * 7, 18)
+	b:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", x, -4)
+	b.text = UI.Text(b, sort and "GameFontNormalSmall" or "GameFontDisableSmall", label)
+	b.text:SetPoint("LEFT", 2, 0)
+	function b:SetOn(on)
+		self.on = on and true or false
+		if not sort then return end
+		if self.on then self.text:SetFontObject("GameFontHighlightSmall") else self.text:SetFontObject("GameFontNormalSmall") end
+	end
+	if sort then
+		b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		b.tip = "Sort by " .. label:lower()
+		b:SetScript("OnEnter", UI.ShowTip)
+		b:SetScript("OnLeave", UI.HideTip)
+		b:SetScript("OnClick", function()
+			UI.Click()
+			players.sort = sort
+			players.offset = 0
+			refreshPlayers()
+		end)
+	end
+	return b
+end
+
 local function buildPlayers(page)
-	page.search = UI.Edit(page, 210, 22, "Search a name, tag or note")
-	page.search:SetPoint("TOPLEFT", 12, -8)
+	page.search = UI.Search(page, 220, "Search a name, tag or note")
+	page.search:SetPoint("TOPLEFT", frame, "TOPLEFT", 74, -32)
 	page.search.onChange = function(self)
 		players.search = ns.Trim(self:GetText())
 		players.offset = 0
@@ -206,12 +252,12 @@ local function buildPlayers(page)
 	page.chips = {}
 	local previous
 	local function chip(label, family)
-		local b = UI.Button(page, label, 8 + #label * 6.4, 22)
+		local b = UI.Button(page, label, 14 + #label * 6.2, 22, true)
 		b.family = family
 		if previous then
-			b:SetPoint("LEFT", previous, "RIGHT", 4, 0)
+			b:SetPoint("LEFT", previous, "RIGHT", 2, 0)
 		else
-			b:SetPoint("LEFT", page.search, "RIGHT", 10, 0)
+			b:SetPoint("LEFT", page.search, "RIGHT", 12, 0)
 		end
 		b:SetScript("OnClick", function()
 			players.family = family
@@ -224,50 +270,33 @@ local function buildPlayers(page)
 	chip("All", nil)
 	for _, family in ipairs(ns.FAMILIES) do chip(family.name, family.id) end
 
-	-- column headers; Player and Last seen sort the list
-	local function header(label, x, sort)
-		if not sort then
-			local text = UI.Text(page, "GameFontDisableSmall", label)
-			text:SetPoint("TOPLEFT", page, "TOPLEFT", x, -(LIST_TOP - 18))
-			return text
-		end
-		local b = UI.Button(page, label, 8 + #label * 6.4, 18)
-		b:SetPoint("TOPLEFT", page, "TOPLEFT", x - 4, -(LIST_TOP - 22))
-		b.tip = "Sort by " .. label:lower()
-		b:SetScript("OnClick", function()
-			players.sort = sort
-			players.offset = 0
-			refreshPlayers()
-		end)
-		return b
-	end
-	page.sortName = header("PLAYER", 14, "name")
-	header("TAGS", 190)
-	page.sortSeen = header("LAST SEEN", 330, "seen")
-	header("NOTE", 488)
+	page.sortName = header(page, "PLAYER", 10, "name")
+	header(page, "TAGS", 188)
+	page.sortSeen = header(page, "LAST SEEN", 334, "seen")
+	header(page, "NOTE", 528)
 
 	for i = 1, VISIBLE do players.rows[i] = makePlayerRow(page, i) end
 
 	page.thumb = page:CreateTexture(nil, "ARTWORK")
 	page.thumb:SetWidth(4)
-	page.thumb:SetColorTexture(0.35, 0.40, 0.46, 1)
+	page.thumb:SetColorTexture(0.55, 0.55, 0.55, 0.6)
 	page.thumb:Hide()
 
 	page.empty = UI.Text(page, "GameFontDisable")
-	page.empty:SetPoint("TOP", page, "TOP", 0, -(LIST_TOP + 60))
+	page.empty:SetPoint("TOP", frame.Inset, "TOP", 0, -(LIST_TOP + 60))
 	page.empty:SetWidth(460)
 	page.empty:SetJustifyH("CENTER")
 	page.empty:Hide()
 
-	page.count = UI.Text(page, "GameFontDisableSmall")
-	page.count:SetPoint("BOTTOMLEFT", 14, 14)
+	page.count = UI.Text(page, "GameFontHighlightSmall")
+	page.count:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 106, UI.BAR_TEXT_Y)
 
-	local import = UI.Button(page, "Import", 76, 22)
-	import:SetPoint("BOTTOMRIGHT", -12, 10)
+	local import = UI.Button(page, "Import", 80, 22)
+	import:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, UI.BAR_Y)
 	import.tip = "Paste a backup made with Export."
 	import:SetScript("OnClick", function() ns.ShowShare("import") end)
-	local export = UI.Button(page, "Export", 76, 22)
-	export:SetPoint("RIGHT", import, "LEFT", -6, 0)
+	local export = UI.Button(page, "Export", 80, 22)
+	export:SetPoint("RIGHT", import, "LEFT", -2, 0)
 	export.tip = "Your whole list as text, to copy somewhere safe."
 	export:SetScript("OnClick", function() ns.ShowShare("export") end)
 
@@ -283,7 +312,7 @@ refreshers.players = refreshPlayers
 ---------------------------------------------------------------------------
 -- Tags tab: the tag list on the left, an editor on the right
 ---------------------------------------------------------------------------
-local TAG_COLS, TAG_ROWS, CELL_W, CELL_H = 2, 17, 160, 22
+local TAG_COLS, TAG_ROWS, CELL_W, CELL_H = 2, 16, 168, 24
 local tagsPage = { cells = {}, offset = 0, editing = nil, deleteArmed = false }
 local editTag, paintEditor
 
@@ -300,7 +329,7 @@ local function refreshTags()
 			cell.tag = tag
 			cell.badge:SetTag(tag.id)
 			cell.badge:SetDim(tag.hidden)
-			cell.label:SetText(tag.name .. (tag.hidden and " |cff777777(hidden)|r" or ""))
+			cell.label:SetText(tag.name .. (tag.hidden and " |cff808080(hidden)|r" or ""))
 			cell:SetOn(editing ~= nil and editing.id == tag.id)
 			cell:Show()
 		else
@@ -318,10 +347,9 @@ function paintEditor()
 	local family = ns.familyById[e.family] or ns.familyById.info
 
 	page.editorTitle:SetText(e.id and "Edit tag" or "New tag")
-	for _, b in ipairs(page.familyButtons) do b:SetOn(b.family == e.family) end
+	for _, r in ipairs(page.familyButtons) do r:SetChecked(r.family == e.family) end
 	for index, b in ipairs(page.glyphButtons) do
 		b.badge:SetGlyph(index - 1, family.r, family.g, family.b)
-		b.badge:SetDim(index - 1 ~= e.glyph)
 		b:SetOn(index - 1 == e.glyph)
 	end
 	page.showCheck:SetChecked(not e.hidden)
@@ -352,29 +380,30 @@ function editTag(tag)
 	tagsPage.deleteArmed = false
 	if page then
 		page.nameEdit:SetText(e.name)
-		page.nameEdit:Refresh()
 		page.message:SetText("")
 	end
 	refreshTags()
 end
 
 local function buildTags(page)
-	local hint = UI.Text(page, "GameFontDisableSmall", "Click a tag to edit it. Hidden tags stay on players but leave the tagging popup.")
-	hint:SetPoint("TOPLEFT", 12, -10)
+	local inset = frame.Inset
+	local hint = UI.Text(page, "GameFontHighlightSmall", "Click a tag to edit it. Hidden tags stay on players but leave the tagging popup.")
+	hint:SetPoint("TOPLEFT", frame, "TOPLEFT", 74, -38)
 
 	for i = 1, TAG_COLS * TAG_ROWS do
 		local col = (i - 1) % TAG_COLS
 		local row = math.floor((i - 1) / TAG_COLS)
-		local cell = UI.Button(page, "", CELL_W, CELL_H)
-		cell:SetPoint("TOPLEFT", page, "TOPLEFT", 12 + col * (CELL_W + 4), -(32 + row * (CELL_H + 2)))
+		local cell = UI.Row(page, CELL_H)
+		cell:SetWidth(CELL_W)
+		cell:SetPoint("TOPLEFT", inset, "TOPLEFT", 8 + col * (CELL_W + 4), -(8 + row * CELL_H))
 		cell.badge = ns.CreateBadge(cell, 16)
 		cell.badge:SetPoint("LEFT", cell, "LEFT", 4, 0)
-		cell.label:ClearAllPoints()
+		cell.label = UI.Text(cell, "GameFontHighlight")
 		cell.label:SetPoint("LEFT", cell.badge, "RIGHT", 6, 0)
 		cell.label:SetPoint("RIGHT", cell, "RIGHT", -4, 0)
-		cell.label:SetJustifyH("LEFT")
 		cell.label:SetWordWrap(false)
 		cell:SetScript("OnClick", function(self)
+			UI.Click()
 			if self.tag then editTag(ns.GetTag(self.tag.id)) end
 		end)
 		tagsPage.cells[i] = cell
@@ -385,45 +414,56 @@ local function buildTags(page)
 		refreshTags()
 	end)
 
-	-- editor
-	local X = 360
-	page.editorTitle = UI.Text(page, "GameFontNormal", "New tag")
-	page.editorTitle:SetPoint("TOPLEFT", X, -32)
+	-- the editor, to the right of the list
+	local divider = page:CreateTexture(nil, "ARTWORK")
+	divider:SetColorTexture(1, 1, 1, 0.08)
+	divider:SetWidth(1)
+	divider:SetPoint("TOPLEFT", inset, "TOPLEFT", 356, -8)
+	divider:SetPoint("BOTTOMLEFT", inset, "BOTTOMLEFT", 356, 8)
 
-	local nameLabel = UI.Text(page, "GameFontDisableSmall", "NAME")
-	nameLabel:SetPoint("TOPLEFT", X, -58)
-	page.nameEdit = UI.Edit(page, 220, 22, "Tag name")
-	page.nameEdit:SetPoint("TOPLEFT", X, -72)
+	local X = 376
+	local function at(widget, y, x)
+		widget:SetPoint("TOPLEFT", inset, "TOPLEFT", X + (x or 0), -y)
+	end
+
+	page.editorTitle = UI.Text(page, "GameFontNormalLarge", "New tag")
+	at(page.editorTitle, 12)
+
+	local nameLabel = UI.Text(page, "GameFontNormalSmall", "Name")
+	at(nameLabel, 44)
+	page.nameEdit = UI.Edit(page, 230, 20, "Tag name")
+	at(page.nameEdit, 58, 6)
 	page.nameEdit:SetMaxLetters(24)
 	page.nameEdit.onChange = function(self)
 		if tagsPage.editing then tagsPage.editing.name = self:GetText() end
 	end
 
-	local familyLabel = UI.Text(page, "GameFontDisableSmall", "FAMILY")
-	familyLabel:SetPoint("TOPLEFT", X, -106)
+	local familyLabel = UI.Text(page, "GameFontNormalSmall", "Family")
+	at(familyLabel, 90)
 	page.familyButtons = {}
 	for i, family in ipairs(ns.FAMILIES) do
-		local b = UI.Button(page, family.name, 86, 22)
-		b.family = family.id
-		b:SetPoint("TOPLEFT", page, "TOPLEFT", X + (i - 1) * 90, -120)
-		b:SetScript("OnClick", function()
+		local r = UI.Radio(page, family.name)
+		r.family = family.id
+		at(r, 106 + math.floor((i - 1) / 2) * 20, ((i - 1) % 2) * 150)
+		r:SetScript("OnClick", function()
+			UI.Click()
 			if not tagsPage.editing then return end
 			tagsPage.editing.family = family.id
 			paintEditor()
 		end)
-		page.familyButtons[i] = b
+		page.familyButtons[i] = r
 	end
 
-	local glyphLabel = UI.Text(page, "GameFontDisableSmall", "PICTURE")
-	glyphLabel:SetPoint("TOPLEFT", X, -154)
+	local glyphLabel = UI.Text(page, "GameFontNormalSmall", "Picture")
+	at(glyphLabel, 152)
 	page.glyphButtons = {}
 	for index = 0, ns.GLYPH_COUNT - 1 do
 		local col, row = index % 8, math.floor(index / 8)
-		local b = UI.Button(page, "", 32, 32)
-		b:SetPoint("TOPLEFT", page, "TOPLEFT", X + col * 36, -(168 + row * 36))
-		b.badge = ns.CreateBadge(b, 24)
-		b.badge:SetPoint("CENTER")
+		local b = UI.IconToggle(page, 26)
+		b:SetSize(26, 26)
+		at(b, 168 + row * 32, col * 32)
 		b:SetScript("OnClick", function()
+			UI.Click()
 			if not tagsPage.editing then return end
 			tagsPage.editing.glyph = index
 			paintEditor()
@@ -432,13 +472,13 @@ local function buildTags(page)
 	end
 
 	page.showCheck = UI.Check(page, "Show in the tagging popup")
-	page.showCheck:SetPoint("TOPLEFT", X, -322)
+	at(page.showCheck, 300, -4)
 	page.showCheck.onChange = function(checked)
 		if tagsPage.editing then tagsPage.editing.hidden = not checked end
 	end
 
-	local save = UI.Button(page, "Save", 86, 24)
-	save:SetPoint("TOPLEFT", X, -356)
+	local save = UI.Button(page, "Save", 90, 22)
+	at(save, 336)
 	save:SetScript("OnClick", function()
 		local e = tagsPage.editing
 		if not e then return end
@@ -446,20 +486,20 @@ local function buildTags(page)
 		page.nameEdit:ClearFocus()
 		local id, problem = ns.SaveTag(e.id, e)
 		if not id then
-			page.message:SetText("|cffff5a52" .. (problem or "That did not save.") .. "|r")
+			page.message:SetText("|cffff2020" .. (problem or "That did not save.") .. "|r")
 			return
 		end
 		ns.SetTagHidden(id, e.hidden)
 		editTag(ns.GetTag(id))
-		page.message:SetText("|cff4bdb69Saved.|r")
+		page.message:SetText("|cff20ff20Saved.|r")
 	end)
 
-	local new = UI.Button(page, "New tag", 86, 24)
-	new:SetPoint("LEFT", save, "RIGHT", 6, 0)
+	local new = UI.Button(page, "New tag", 90, 22)
+	new:SetPoint("LEFT", save, "RIGHT", 4, 0)
 	new:SetScript("OnClick", function() editTag(nil) end)
 
-	page.third = UI.Button(page, "Delete", 86, 24)
-	page.third:SetPoint("LEFT", new, "RIGHT", 6, 0)
+	page.third = UI.Button(page, "Delete", 90, 22)
+	page.third:SetPoint("LEFT", new, "RIGHT", 4, 0)
 	page.third:SetScript("OnClick", function()
 		local e = tagsPage.editing
 		if not e or not e.id then return end
@@ -467,7 +507,7 @@ local function buildTags(page)
 			ns.ResetTag(e.id)
 			ns.SetTagHidden(e.id, false)
 			editTag(ns.GetTag(e.id))
-			page.message:SetText("|cff4bdb69Back to the original.|r")
+			page.message:SetText("|cff20ff20Back to the original.|r")
 			return
 		end
 		if not tagsPage.deleteArmed then
@@ -477,12 +517,12 @@ local function buildTags(page)
 		end
 		ns.DeleteTag(e.id)
 		editTag(nil)
-		page.message:SetText("|cff4bdb69Deleted.|r")
+		page.message:SetText("|cff20ff20Deleted.|r")
 	end)
 
 	page.message = UI.Text(page, "GameFontHighlightSmall")
-	page.message:SetPoint("TOPLEFT", X, -390)
-	page.message:SetWidth(340)
+	at(page.message, 368)
+	page.message:SetWidth(380)
 
 	editTag(nil)
 end
@@ -490,170 +530,45 @@ end
 refreshers.tags = refreshTags
 
 ---------------------------------------------------------------------------
--- Options tab
----------------------------------------------------------------------------
-local CHECKS = {
-	{ key = "nameplates", label = "Tag icons on nameplates",
-		help = "Enemy players, and friendly players if they have nameplates." },
-	{ key = "friendly", label = "Give friendly players nameplates",
-		help = "Changes every friendly player's name into nameplate text." },
-	{ key = "tooltip", label = "Tags and notes in tooltips" },
-	{ key = "chat", label = "Tag icons in chat",
-		help = "Not inside dungeons and raids, where the game hides who is speaking." },
-	{ key = "frames", label = "Tag icons on target, party and raid frames" },
-	{ key = "groupAlert", label = "Tell me when tagged players are in my group" },
-	{ key = "alertSound", label = "Play a sound when one of them is tagged Avoid" },
-	{ key = "finder", label = "Marks on Group Finder listings" },
-	{ key = "menu", label = "\"Tag player\" in right-click menus" },
-	{ key = "minimap", label = "Button on the minimap" },
-	{ key = "popupAtCursor", label = "Open the tagging popup at the mouse pointer",
-		help = "Otherwise it opens mid-screen, or where you last dragged it." },
-}
-
-local function refreshOptions()
-	local page = pages.options
-	if not page then return end
-	for _, check in ipairs(page.checks) do
-		if check.key == "friendly" then
-			check:SetChecked(ns.settings.friendlyPlates == "on")
-		else
-			check:SetChecked(ns.settings[check.key] == true)
-		end
-	end
-	for _, b in ipairs(page.sizeButtons) do b:SetOn(ns.settings.plateSize == b.value) end
-	for _, b in ipairs(page.maxButtons) do b:SetOn(ns.settings.plateMax == b.value) end
-
-	local lines = {}
-	for _, name in ipairs(ns.moduleOrder) do
-		local state = ns.moduleState[name] or "?"
-		local color = (state:sub(1, 2) == "ok") and "|cff4bdb69" or "|cffff5a52"
-		lines[#lines + 1] = name .. ": " .. color .. state .. "|r"
-	end
-	lines[#lines + 1] = " "
-	if #ns.errors == 0 then
-		lines[#lines + 1] = "Problems: |cff4bdb69none|r"
-	else
-		lines[#lines + 1] = "|cffff5a52Problems: " .. #ns.errors .. "|r. Type /tags status to list them."
-	end
-	page.status:SetText(table.concat(lines, "\n"))
-end
-
-local function buildOptions(page)
-	page.checks = {}
-	local y = 12
-	for i, def in ipairs(CHECKS) do
-		local check = UI.Check(page, def.label, def.help)
-		check.key = def.key
-		check:SetPoint("TOPLEFT", 14, -y)
-		y = y + (def.help and 42 or 26)
-		check.onChange = function(checked)
-			if def.key == "friendly" then
-				ns.settings.friendlyPlates = checked and "on" or "off"
-				ns.ApplyFriendlyPlates()
-			else
-				ns.settings[def.key] = checked
-			end
-			ns.Fire("SETTINGS_CHANGED")
-		end
-		page.checks[i] = check
-	end
-
-	local function choice(label, top, key, options, store)
-		local text = UI.Text(page, "GameFontHighlightSmall", label)
-		text:SetPoint("TOPLEFT", 14, -top - 5)
-		for i, option in ipairs(options) do
-			local b = UI.Button(page, option[1], 70, 22)
-			b.value = option[2]
-			b:SetPoint("TOPLEFT", page, "TOPLEFT", 200 + (i - 1) * 74, -top)
-			b:SetScript("OnClick", function()
-				ns.settings[key] = option[2]
-				ns.Fire("SETTINGS_CHANGED")
-				refreshOptions()
-			end)
-			store[i] = b
-		end
-	end
-	page.sizeButtons, page.maxButtons = {}, {}
-	y = y + 8
-	choice("Icon size on nameplates", y, "plateSize", { { "Small", 14 }, { "Medium", 17 }, { "Large", 21 } }, page.sizeButtons)
-	choice("Most icons on a nameplate", y + 30, "plateMax", { { "2", 2 }, { "3", 3 }, { "4", 4 } }, page.maxButtons)
-
-	local statusTitle = UI.Text(page, "GameFontNormal", "Status")
-	statusTitle:SetPoint("TOPLEFT", 440, -12)
-	page.status = UI.Text(page, "GameFontHighlightSmall")
-	page.status:SetPoint("TOPLEFT", statusTitle, "BOTTOMLEFT", 0, -8)
-	page.status:SetWidth(280)
-	page.status:SetJustifyV("TOP")
-	if page.status.SetSpacing then page.status:SetSpacing(3) end
-
-	-- Sits under the status list, which grows and shrinks.
-	local keys = UI.Text(page, "GameFontDisableSmall",
-		"Set your tagging key under Options > Keybindings > AddOns > Player Tags.\n\n"
-		.. "Without a key, target a player and type /tag.\n\n"
-		.. "Everything you tag is stored on this computer only.")
-	keys:SetPoint("TOPLEFT", page.status, "BOTTOMLEFT", 0, -22)
-	keys:SetWidth(280)
-	keys:SetJustifyV("TOP")
-	if keys.SetSpacing then keys:SetSpacing(2) end
-end
-
-refreshers.options = refreshOptions
-
----------------------------------------------------------------------------
 -- Window shell
 ---------------------------------------------------------------------------
 local TABS = {
 	{ id = "players", label = "Players", build = buildPlayers },
 	{ id = "tags", label = "Tags", build = buildTags },
-	{ id = "options", label = "Options", build = buildOptions },
 }
 
 local function selectTab(id)
+	if not pages[id] then id = "players" end
 	currentTab = id
 	for _, tab in ipairs(TABS) do
 		local page = pages[tab.id]
 		if tab.id == id then page:Show() else page:Hide() end
-		tabButtons[tab.id]:SetOn(tab.id == id)
 	end
+	frame:SelectTabId(id)
 	players.confirm = nil
 	refreshers[id]()
 end
 
 local function build()
-	frame = UI.Panel("PlayerTagsFrame")
-	frame:SetFrameStrata("HIGH")
-	frame:SetSize(W, H)
+	frame = UI.Window("PlayerTagsFrame", "Player Tags", W, H)
 	UI.Movable(frame, "window")
 	UI.Place(frame, "window")
 	frame:Hide()
 	table.insert(UISpecialFrames, "PlayerTagsFrame")
 
-	local title = UI.Text(frame, "GameFontNormalLarge", "Player Tags")
-	title:SetPoint("TOPLEFT", 14, -14)
+	local settings = UI.Button(frame, "Settings", 92, 22)
+	settings:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 10, UI.BAR_Y)
+	settings.tip = "Player Tags settings, in the game's Options under AddOns."
+	settings:SetScript("OnClick", function() ns.OpenSettings() end)
 
-	local close = UI.Button(frame, "x", 22, 22)
-	close:SetPoint("TOPRIGHT", -10, -10)
-	close:SetScript("OnClick", function() frame:Hide() end)
-
-	local rule = frame:CreateTexture(nil, "BORDER")
-	rule:SetPoint("TOPLEFT", 1, -TOP)
-	rule:SetPoint("TOPRIGHT", -1, -TOP)
-	rule:SetHeight(1)
-	rule:SetColorTexture(0.17, 0.20, 0.25, 1)
-
-	for i, tab in ipairs(TABS) do
-		local b = UI.Button(frame, tab.label, 84, 24)
-		b:SetPoint("TOPLEFT", frame, "TOPLEFT", 150 + (i - 1) * 88, -12)
-		b:SetScript("OnClick", function() selectTab(tab.id) end)
-		tabButtons[tab.id] = b
-
+	for _, tab in ipairs(TABS) do
 		local page = CreateFrame("Frame", nil, frame)
-		page:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -TOP)
-		page:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+		page:SetAllPoints(frame)
 		page:Hide()
 		pages[tab.id] = page
 		tab.build(page)
 	end
+	UI.Tabs(frame, TABS, selectTab)
 
 	frame:SetScript("OnShow", function() selectTab(currentTab) end)
 	frame:SetScript("OnHide", function()
@@ -662,11 +577,17 @@ local function build()
 	end)
 end
 
---- Opens the window on a tab ("players", "tags", "options"), optionally
---- with the player search filled in.
+--- Opens the window on a tab ("players", "tags"), optionally with the
+--- player search filled in. With no tab it opens on Players: everything
+--- that says "open your list" means the list of players, not whichever tab
+--- was used last. "options" opens the game's Settings instead.
 function ns.ShowWindow(tab, search)
+	if tab == "options" then
+		ns.OpenSettings()
+		return
+	end
 	if not frame then build() end
-	if tab and pages[tab] then currentTab = tab end
+	currentTab = (tab and pages[tab]) and tab or "players"
 	if search and pages.players then
 		players.search = ns.Trim(search)
 		players.offset = 0
@@ -674,6 +595,9 @@ function ns.ShowWindow(tab, search)
 		pages.players.search:Refresh()
 	end
 	if frame:IsShown() then selectTab(currentTab) else frame:Show() end
+	-- The game's Settings panel shares this window's layer; opened from
+	-- there, the list must come out on top of it.
+	frame:Raise()
 	-- The game can need a moment to look up a player it has not seen this
 	-- session, so ask once more shortly after the list opens.
 	ns.Debounce("list learn", 2, function()
@@ -694,7 +618,11 @@ local function refreshIfOpen()
 end
 
 ns.Listen("RECORD_CHANGED", refreshIfOpen, "window")
-ns.Listen("SETTINGS_CHANGED", refreshIfOpen, "window")
+ns.Listen("SETTINGS_CHANGED", function()
+	UI.ApplyScale(frame)
+	UI.ApplyScale(_G.PlayerTagsShare)
+	refreshIfOpen()
+end, "window")
 ns.Listen("TAGS_CHANGED", function()
 	if not (frame and frame:IsShown()) then return end
 	-- An edited tag keeps its editor open; a deleted one falls back to "New tag".
@@ -712,41 +640,29 @@ end, "window")
 local share
 
 local function buildShare()
-	share = UI.Panel("PlayerTagsShare")
+	share = UI.Window("PlayerTagsShare", "Export", 540, 400)
 	share:SetFrameStrata("DIALOG")
-	share:SetSize(520, 380)
 	share:SetPoint("CENTER")
 	share:Hide()
 	UI.Movable(share)
 	table.insert(UISpecialFrames, "PlayerTagsShare")
 
-	share.title = UI.Text(share, "GameFontNormalLarge", "Export")
-	share.title:SetPoint("TOPLEFT", 14, -14)
-	share.hint = UI.Text(share, "GameFontDisableSmall")
-	share.hint:SetPoint("TOPLEFT", share.title, "BOTTOMLEFT", 0, -6)
-	share.hint:SetWidth(490)
+	share.hint = UI.Text(share, "GameFontHighlightSmall")
+	share.hint:SetPoint("TOPLEFT", share, "TOPLEFT", 74, -30)
+	share.hint:SetPoint("RIGHT", share, "RIGHT", -12, 0)
+	share.hint:SetJustifyV("TOP")
 
-	local close = UI.Button(share, "x", 22, 22)
-	close:SetPoint("TOPRIGHT", -10, -10)
-	close:SetScript("OnClick", function() share:Hide() end)
-
-	local box = CreateFrame("Frame", nil, share)
-	box:SetPoint("TOPLEFT", 14, -62)
-	box:SetPoint("BOTTOMRIGHT", -14, 46)
-	UI.Fill(box, 0.03, 0.04, 0.055, 1)
-	UI.Edges(box, 0.17, 0.20, 0.25, 1)
-
-	local scroll = CreateFrame("ScrollFrame", nil, box)
-	scroll:SetPoint("TOPLEFT", 6, -6)
-	scroll:SetPoint("BOTTOMRIGHT", -6, 6)
+	local scroll = CreateFrame("ScrollFrame", nil, share)
+	scroll:SetPoint("TOPLEFT", share.Inset, "TOPLEFT", 8, -8)
+	scroll:SetPoint("BOTTOMRIGHT", share.Inset, "BOTTOMRIGHT", -8, 8)
 	scroll:EnableMouse(true)
 	scroll:EnableMouseWheel(true)
 
 	local edit = CreateFrame("EditBox", nil, scroll)
 	edit:SetMultiLine(true)
 	edit:SetAutoFocus(false)
-	edit:SetFontObject(GameFontHighlightSmall)
-	edit:SetWidth(476)
+	edit:SetFontObject("ChatFontNormal")
+	edit:SetWidth(500)
 	edit:SetMaxLetters(0)
 	edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	scroll:SetScrollChild(edit)
@@ -773,18 +689,18 @@ local function buildShare()
 	end)
 
 	share.message = UI.Text(share, "GameFontHighlightSmall")
-	share.message:SetPoint("BOTTOMLEFT", 14, 16)
+	share.message:SetPoint("BOTTOMLEFT", share, "BOTTOMLEFT", 14, UI.BAR_TEXT_Y)
 	share.message:SetWidth(380)
 
-	share.action = UI.Button(share, "Import", 100, 24)
-	share.action:SetPoint("BOTTOMRIGHT", -14, 12)
+	share.action = UI.Button(share, "Import", 100, 22)
+	share.action:SetPoint("BOTTOMRIGHT", share, "BOTTOMRIGHT", -10, UI.BAR_Y)
 	share.action:SetScript("OnClick", function()
 		if share.mode == "import" then
 			local summary, problem = ns.Import(edit:GetText())
 			if summary then
-				share.message:SetText("|cff4bdb69" .. summary .. "|r")
+				share.message:SetText("|cff20ff20" .. summary .. "|r")
 			else
-				share.message:SetText("|cffff5a52" .. (problem or "That did not import.") .. "|r")
+				share.message:SetText("|cffff2020" .. (problem or "That did not import.") .. "|r")
 			end
 		else
 			edit:SetFocus()
@@ -799,7 +715,7 @@ function ns.ShowShare(mode)
 	share.mode = mode
 	share.message:SetText("")
 	if mode == "import" then
-		share.title:SetText("Import")
+		share:SetTitle("Import")
 		share.hint:SetText("Paste a Player Tags export below, then press Import. Your own tags and notes are kept; only what is missing gets added.")
 		share.action:SetLabel("Import")
 		share.edit:SetText("")
@@ -807,7 +723,7 @@ function ns.ShowShare(mode)
 		share.edit:SetFocus()
 	else
 		local text, count = ns.Export()
-		share.title:SetText("Export")
+		share:SetTitle("Export")
 		share.hint:SetText(count .. (count == 1 and " player. " or " players. ") .. "Press Ctrl+C to copy, then paste it into a text file to keep.")
 		share.action:SetLabel("Select all")
 		share.edit:SetText(text)

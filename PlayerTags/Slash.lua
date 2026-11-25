@@ -1,6 +1,7 @@
 -- Slash commands.
 --   /tags                 open the list          (also /playertags, /ptags)
---   /tags options|tags    open that tab
+--   /tags options         the settings page, in the game's Settings panel
+--   /tags tags            the Tags tab
 --   /tags status          what is loaded, and any problems
 --   /tags export|import   backup as text
 --   /tag                  tagging popup for your target or mouseover
@@ -57,7 +58,7 @@ local function handleTags(message)
 	if command == "" then
 		ns.ToggleWindow()
 	elseif command == "options" or command == "config" or command == "settings" then
-		ns.ShowWindow("options")
+		ns.OpenSettings()
 	elseif command == "tags" then
 		ns.ShowWindow("tags")
 	elseif command == "status" or command == "debug" then

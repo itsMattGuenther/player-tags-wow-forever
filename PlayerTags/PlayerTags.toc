@@ -15,6 +15,7 @@ Tags.lua
 Database.lua
 Icons.lua
 Widgets.lua
+Alerts.lua
 QuickTag.lua
 Nameplates.lua
 Tooltip.lua
@@ -25,5 +26,6 @@ Group.lua
 Finder.lua
 Share.lua
 Window.lua
+Settings.lua
 Minimap.lua
 Slash.lua

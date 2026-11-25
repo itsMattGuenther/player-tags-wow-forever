@@ -36,7 +36,7 @@ You can rename them, hide the ones you don't use, and make your own.
 - **Tooltips:** every tag, how long ago you added it, your note, and where you were when you tagged them.
 - **Chat:** small tag icons in front of the sender's name.
 - **Unit frames:** target, focus, party and raid frames.
-- **Groups:** a short heads-up when someone you've tagged joins your group, plus an optional sound for Avoid tags.
+- **Groups:** a small alert box and a line in chat when someone you've tagged joins your group, plus an optional sound for Avoid tags. You can move the alert box from the settings.
 - **Group Finder:** the leader's tags on a listing, and a count of other tagged players in the group.
 - **Nameplates:** up to three icons by default (Avoid tags first), over enemy players in the open world.
 
@@ -76,11 +76,12 @@ Use the zip from the Releases page, not GitHub's green **Code → Download ZIP**
 | `/untag rude` | Removes one tag. `/untag` on its own removes them all. |
 | `/tags` | Opens your list. |
 | Minimap button | Left-click opens your list, right-click tags your target, drag to move it around the minimap. |
-| `/tags options`, `/tags tags` | The options, and the tag editor. |
+| `/tags options` | The settings, which are also in the game's own menu: Esc → Options → AddOns → Player Tags. |
+| `/tags tags` | The tag editor. |
 | `/tags export`, `/tags import` | Back up your list as text, or restore it. |
 | `/tags status` | Shows what's loaded and any problems the addon caught. |
 
-The list and the popup open in the middle of the screen the first time. Drag them anywhere and they'll open there from then on. If you'd rather the popup opened at your mouse pointer, there's an option for that.
+The windows look and behave like the game's own: Esc closes them, and the settings let you change their size or switch the tagging popup to a compact, icons-only version. The list and the popup open in the middle of the screen the first time. Drag them anywhere and they'll open there from then on. If you'd rather the popup opened at your mouse pointer, there's an option for that.
 
 Player Tags is also in the game's addon menu, the small numbered button by the minimap, even if you hide its own minimap button.
 
@@ -92,12 +93,12 @@ These limits come from the game, not the addon:
 
 - **Nameplates inside dungeons and raids:** Blizzard locks friendly nameplates there, so group frames carry the tags instead.
 - **Chat inside instances:** the game hides who's talking from addons, so chat icons don't appear there.
-- **Friendly nameplates in the open world:** friendly players don't have nameplates by default, so nameplate icons appear over enemy players only. Friendly players' tags still show in tooltips, chat, and on target and group frames. An option, off by default, gives friendly players name-only nameplates so icons can sit above them too. Unticking it restores your previous settings.
+- **Friendly nameplates in the open world:** friendly players don't have nameplates by default, so nameplate icons appear over enemy players only. Friendly players' tags still show in tooltips, chat, and on target and group frames. An option, off by default, gives friendly players name-only nameplates so icons can sit above them too. Those names are drawn to look like the game's own: the same blue, font and guild line, and never cut short. You can switch them to class colours or white, or change their size. Unticking it restores your previous settings.
 
 **Backing up:** `/tags export` gives you your whole list as text you can save anywhere. `/tags import` brings it back. The data itself is in `_forever_/WTF/Account/<your account>/SavedVariables/PlayerTags.lua`.
 
 <p>
-  <img src="screenshots/04-options.png" alt="The options tab" width="49%">
+  <img src="screenshots/04-settings.png" alt="Player Tags settings in the game's Options, under AddOns" width="49%">
   <img src="screenshots/05-minimap-button.png" alt="The minimap button and its tooltip" width="49%">
 </p>
 
@@ -115,11 +116,13 @@ PlayerTags/        the addon (this folder is what goes in Interface/AddOns)
   Tags.lua         families and the 22 starter tags
   Database.lua     saved data, player identity, tagging
   Icons.lua        icon atlas, inline icons, badges
-  Widgets.lua      small self-drawn UI kit
+  Widgets.lua      windows and controls built from the game's own templates
+  Alerts.lua       the alert box
   QuickTag.lua     the tagging popup
   Nameplates.lua   Tooltip.lua  Chat.lua  Menu.lua  Frames.lua  Group.lua  Finder.lua
   Share.lua        export / import
   Window.lua       the /tags window
+  Settings.lua     the page in the game's Options, under AddOns
   Minimap.lua      the minimap button
   Slash.lua        slash commands
   Media/           glyphs.tga (icon atlas), icon.tga, minimap.tga

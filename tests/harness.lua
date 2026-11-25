@@ -58,7 +58,14 @@ function methods:CreateTexture() return new("Texture", self) end
 function methods:CreateFontString() return new("FontString", self) end
 function methods:SetScript(name, fn) self.__scripts[name] = fn end
 function methods:GetScript(name) return self.__scripts[name] end
-function methods:HookScript(name, fn) self.__scripts[name] = fn end
+function methods:HookScript(name, fn)
+	local before = self.__scripts[name]
+	if not before then
+		self.__scripts[name] = fn
+	else
+		self.__scripts[name] = function(...) before(...) fn(...) end
+	end
+end
 function methods:Show()
 	local was = self.__shown
 	self.__shown = true
@@ -74,7 +81,33 @@ function methods:IsVisible() return self.__shown end
 function methods:IsForbidden() return false end
 function methods:IsProtected() return false end
 function methods:HasFocus() return false end
-function methods:SetText(text) self.__text = tostring(text or "") end
+function methods:SetText(text)
+	self.__text = tostring(text or "")
+	-- As in game, an edit box tells its own handler when code changes its text.
+	if self.__kind == "EditBox" and self.__scripts.OnTextChanged then self.__scripts.OnTextChanged(self, false) end
+end
+function methods:SetChecked(on) self.__checked = on and true or false end
+function methods:SetFont(font, size, flags) self.__font = { font, size, flags } return true end
+function methods:GetFont() local f = self.__font or { "Fonts\\FRIZQT__.TTF", 9, "OUTLINE" } return f[1], f[2], f[3] end
+function methods:SetVertexColor(r, g, b) self.__color = { r, g, b } end
+function methods:SetTextColor(r, g, b) self.__color = { r, g, b } end
+function methods:SetShadowOffset(x, y) self.__shadow = { x, y } end
+function methods:GetShadowOffset() local s = self.__shadow or { 0, 0 } return s[1], s[2] end
+function methods:GetChecked() return self.__checked == true end
+function methods:LockHighlight() self.__locked = true end
+function methods:UnlockHighlight() self.__locked = false end
+function methods:SetID(id) self.__id = id end
+function methods:GetID() return self.__id or 0 end
+function methods:SetEnabled(on) self.__disabled = not on end
+function methods:Enable() self.__disabled = false end
+function methods:Disable() self.__disabled = true end
+function methods:IsEnabled() return not self.__disabled end
+function methods:SetScale(scale) self.__scale = scale end
+function methods:GetScale() return self.__scale or 1 end
+function methods:IsMouseOver() return self.__mouseOver == true end
+function methods:SetAlpha(a) self.__alpha = a end
+function methods:SetIgnoreParentAlpha(on) self.__ignoreParentAlpha = on end
+function methods:GetAlpha() return self.__alpha or 1 end
 function methods:GetText() return self.__text end
 function methods:SetWidth(w) self.__w = w end
 function methods:SetHeight(h) self.__h = h end
@@ -120,6 +153,8 @@ function methods:SetUserPlaced(placed) self.__userPlaced = placed end
 function methods:SetJustifyH(j) self.__justify = j end
 function methods:GetJustifyH() return self.__justify or "LEFT" end
 function methods:GetParent() return self.__parent end
+function methods:GetChildren() return unpack(self.__children) end
+function methods:GetObjectType() return self.__kind end
 function methods:RegisterEvent(event)
 	world.events[event] = world.events[event] or {}
 	table.insert(world.events[event], self)
@@ -198,13 +233,150 @@ function H.plate(unit)
 end
 
 ---------------------------------------------------------------------------
+-- Blizzard templates. CreateFrame in game builds these children from the
+-- game's XML; here each template adds the pieces the addon uses, under the
+-- same keys as Forever's own SharedXML (read from the forever branch of the
+-- game's interface source).
+---------------------------------------------------------------------------
+local templates = {}
+
+local function closeButton(parent)
+	local b = new("Button", parent)
+	b:SetScript("OnClick", function(self) _G.HideUIPanel(self:GetParent()) end)
+	return b
+end
+
+local function titled(f)
+	f.TitleContainer = new("Frame", f)
+	f.TitleContainer.TitleText = new("FontString", f.TitleContainer)
+	f.SetTitle = function(self, text) self.TitleContainer.TitleText:SetText(text) end
+	f.GetTitleText = function(self) return self.TitleContainer.TitleText end
+end
+
+templates.PortraitFrameTemplate = function(f)
+	titled(f)
+	f.PortraitContainer = new("Frame", f)
+	f.PortraitContainer.portrait = new("Texture", f.PortraitContainer)
+	f.SetPortraitToAsset = function(self, asset) self.__portrait = asset end
+	f.SetPortraitToUnit = function(self, unit) self.__portrait = "unit:" .. tostring(unit) end
+	f.SetPortraitToClassIcon = function(self, class) self.__portrait = "class:" .. tostring(class) end
+	f.CloseButton = closeButton(f)
+end
+templates.ButtonFrameTemplate = function(f)
+	templates.PortraitFrameTemplate(f)
+	f.Inset = new("Frame", f)
+end
+templates.DefaultPanelFlatTemplate = function(f) titled(f) end
+templates.UIPanelCloseButton = function(b)
+	b:SetScript("OnClick", function(self) _G.HideUIPanel(self:GetParent()) end)
+end
+templates.UIPanelCloseButtonDefaultAnchors = templates.UIPanelCloseButton
+templates.UIPanelButtonTemplate = function(b) b.Text = new("FontString", b) end
+templates.UICheckButtonTemplate = function(c) c.Text = new("FontString", c) end
+templates.UIRadioButtonTemplate = function(c) c.text = new("FontString", c) end
+templates.InputBoxTemplate = function(e)
+	e:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+end
+templates.InputBoxInstructionsTemplate = function(e)
+	templates.InputBoxTemplate(e)
+	e.Instructions = new("FontString", e)
+	e:SetScript("OnTextChanged", function(self)
+		if self:GetText() == "" then self.Instructions:Show() else self.Instructions:Hide() end
+	end)
+end
+templates.SearchBoxTemplate = function(e)
+	templates.InputBoxInstructionsTemplate(e)
+	e.searchIcon = new("Texture", e)
+	e.clearButton = new("Button", e)
+	e.clearButton:SetScript("OnClick", function(self)
+		local box = self:GetParent()
+		box:SetText("")
+		box:ClearFocus()
+	end)
+end
+templates.PanelTabButtonTemplate = function(t, parent)
+	t.Text = new("FontString", t)
+	if parent then
+		parent.Tabs = rawget(parent, "Tabs") or {}
+		table.insert(parent.Tabs, t)
+	end
+end
+
+local function applyTemplates(obj, parent, list)
+	if type(list) ~= "string" then return end
+	for name in list:gmatch("[^,%s]+") do
+		local build = templates[name]
+		if build then build(obj, parent) end
+	end
+end
+
+---------------------------------------------------------------------------
 -- Globals the addon touches
 ---------------------------------------------------------------------------
 function H.install()
 	local G = _G
 
 	G.issecretvalue = function(v) return rawequal(v, H.SECRET) end
-	G.CreateFrame = function(kind, name, parent) return new(kind, parent, name) end
+	G.CreateFrame = function(kind, name, parent, template)
+		local obj = new(kind, parent, name)
+		applyTemplates(obj, parent, template)
+		return obj
+	end
+	G.HideUIPanel = function(frame) frame:Hide() end
+	G.PanelTemplates_SetNumTabs = function(frame, n) frame.numTabs = n end
+	G.PanelTemplates_SetTab = function(frame, id)
+		frame.selectedTab = id
+		for i, tab in ipairs(rawget(frame, "Tabs") or {}) do tab.__selected = (i == id) end
+	end
+	G.PanelTemplates_TabResize = function() end
+	G.ButtonFrameTemplate_HidePortrait = function(frame) frame.__noPortrait = true end
+	G.ButtonFrameTemplate_HideButtonBar = function(frame) frame.__noButtonBar = true end
+
+	-- The game's Settings panel. Registered pages, settings and rows are kept
+	-- in H.settings so the checks can find them and change values.
+	H.settings = { categories = {}, byVariable = {}, rows = {}, opened = nil }
+	local function addRow(row) table.insert(H.settings.rows, row) return row end
+	G.Settings = {
+		VarType = { Boolean = "boolean", Number = "number", String = "string" },
+		Default = { True = true, False = false },
+		RegisterVerticalLayoutCategory = function(name)
+			local category = { name = name, id = #H.settings.categories + 1 }
+			function category:GetID() return self.id end
+			local layout = { AddInitializer = function(_, init) addRow(init) end }
+			table.insert(H.settings.categories, category)
+			return category, layout
+		end,
+		RegisterAddOnCategory = function(category) category.registered = true end,
+		RegisterProxySetting = function(_, variable, kind, name, default, get, set)
+			local setting = { variable = variable, kind = kind, name = name, default = default }
+			function setting:GetValue() return get() end
+			function setting:SetValue(value) set(value) end
+			H.settings.byVariable[variable] = setting
+			return setting
+		end,
+		CreateCheckbox = function(_, setting, tooltip) return addRow({ control = "checkbox", setting = setting, tooltip = tooltip }) end,
+		CreateSlider = function(_, setting, options, tooltip) return addRow({ control = "slider", setting = setting, options = options, tooltip = tooltip }) end,
+		CreateDropdown = function(_, setting, options, tooltip) return addRow({ control = "dropdown", setting = setting, options = options, tooltip = tooltip }) end,
+		CreateSliderOptions = function(min, max, step)
+			local options = { min = min, max = max, step = step }
+			function options:SetLabelFormatter(_, fn) self.format = fn end
+			return options
+		end,
+		CreateControlTextContainer = function()
+			local data = {}
+			return {
+				Add = function(_, value, label, tooltip) table.insert(data, { value = value, label = label, tooltip = tooltip }) end,
+				GetData = function() return data end,
+			}
+		end,
+		OpenToCategory = function(id) H.settings.opened = id end,
+	}
+	G.MinimalSliderWithSteppersMixin = { Label = { Right = 3 } }
+	G.CreateSettingsListSectionHeaderInitializer = function(name, tooltip) return { header = name, tooltip = tooltip } end
+	G.CreateSettingsButtonInitializer = function(name, text, click, tooltip, search)
+		assert(search ~= nil, "the game asserts that addSearchTags is given")
+		return { control = "button", name = name, text = text, click = click, tooltip = tooltip }
+	end
 	G.UIParent = new("Frame")
 	G.UIParent.__center = { 1000, 600 }
 	G.Minimap = new("Minimap", G.UIParent)
@@ -253,6 +425,20 @@ function H.install()
 	G.UnitLevel = function(token) local u = unit(token) return u and u.level or 0 end
 	G.UnitRace = function(token) local u = unit(token) return u and u.race end
 	G.UnitFactionGroup = function(token) local u = unit(token) return u and u.faction end
+	G.UnitIsFriend = function(_, token) local u = unit(token) return u ~= nil and not u.hostile end
+	G.UnitIsUnit = function(a, b) return unit(a) ~= nil and unit(a) == unit(b) end
+	G.GetUnitName = function(token)
+		local u = unit(token)
+		if not u then return nil end
+		if u.surname then return u.name .. " " .. u.surname end
+		return u.name
+	end
+	G.UnitIsAFK = function(token) local u = unit(token) return u ~= nil and u.afk == true end
+	G.UnitIsDND = function(token) local u = unit(token) return u ~= nil and u.dnd == true end
+	G.GetGuildInfo = function(token) local u = unit(token) return u and u.guild end
+	G.UNIT_NAME_FONT = "Fonts\\FRIZQT__.TTF"
+	G.CHAT_FLAG_AFK = "<Away>"
+	G.CHAT_FLAG_DND = "<Busy>"
 
 	G.C_Timer = { After = function(_, fn) table.insert(world.timers, fn) end }
 	G.C_AddOns = { GetAddOnMetadata = function() return "test" end }

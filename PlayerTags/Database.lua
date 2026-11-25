@@ -17,6 +17,8 @@ local DEFAULTS = {
 	plateSize = 17,         -- icon size on nameplates
 	plateMax = 3,           -- most icons shown on one nameplate
 	friendlyPlates = "off", -- "on" | "off": name-only plates for friendly players (opt-in)
+	friendlyNameColor = "game", -- their names: "game" (the game's blue) | "class" | "white"
+	friendlyNameSize = 1,   -- their size, 0.7 to 1.5
 	tooltip = true,
 	chat = true,
 	frames = true,          -- party, raid and target frames
@@ -26,6 +28,8 @@ local DEFAULTS = {
 	menu = true,            -- right-click "Tag player"
 	minimap = true,         -- the button on the minimap
 	popupAtCursor = false,  -- tagging popup opens at the mouse instead of its own spot
+	compactPopup = false,   -- tagging popup shows icons only, names on hover
+	scale = 1,              -- size of the list, the popup and the alert box
 }
 
 function ns.InitDB()
