@@ -12,7 +12,7 @@ Everything stays on your computer. Nobody else can see your tags unless you choo
 
 **[Download the latest version](https://github.com/itsMattGuenther/player-tags-wow-forever/releases/latest/download/PlayerTags.zip)** · [All releases](https://github.com/itsMattGuenther/player-tags-wow-forever/releases)
 
-> **Beta.** Version 1.0.0-beta.5 is built for WoW: Forever (interface 16001) and has been played in game. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
+Version 1.0.0, built for WoW: Forever (interface 16001). Also on WowUp: choose **Install from URL** and paste this page's address. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
 
 ## What you get
 
@@ -49,10 +49,22 @@ You can rename them, hide the ones you don't use, and make your own.
 - **Someone you avoid is nearby:** an alert when an Avoid-tagged player's nameplate appears, you point at or target them, or they talk nearby. It skips your own group and dungeons, and waits 15 minutes before alerting about the same player again.
 - **Good players looking for a group:** a line in chat, with their name to click, when someone you tagged Good people or Skilled posts in a public channel that they're looking for a group.
 
+<p>
+  <img src="screenshots/06-invite-warning.png" alt="A group invite with the inviter's tags and your note underneath" width="49%">
+  <img src="screenshots/07-nearby-alert.png" alt="The alert when someone you tagged Avoid is nearby" width="49%">
+</p>
+
+![A chat line pointing out a good player who is looking for a group](screenshots/10-lfg-chat.png)
+
 **Tag people while you still remember.**
 
-- **After a group:** when a group of 5 minutes or more ends, a small window lists everyone who was in it (including anyone who left early) with your most-used tags as buttons.
-- **After a world PvP death:** a small window lists the enemy players who were near you, with Ganker and Griefer ready to click.
+- **After a group:** when a group of 5 minutes or more ends, a small window lists everyone who was in it (including anyone who left early). Each player gets the roles their class can play, your favourite good tags, and Low Skill, Leaver and Rude.
+- **After a world PvP death:** a small window lists the enemy players who were near you, with Ganker and Griefer ready to click. Not in battlegrounds, where you die too often for it to be useful.
+
+<p>
+  <img src="screenshots/08-group-card.png" alt="The window after a group: each player with role, good and negative tags as buttons" width="49%">
+  <img src="screenshots/09-killer-card.png" alt="The window after a world PvP death, listing enemy players who were near" width="49%">
+</p>
 
 Want to see them without waiting for the real thing? `/tags test` shows each one with made-up players, and nothing is saved.
 
@@ -68,6 +80,8 @@ Want to see them without waiting for the real thing? `/tags test` shows each one
 - The addon contains no code that sends messages to other players. There's no public blocklist, nothing syncs, and there's no account.
 - There are no scores or ratings. A tag is a note to yourself, not a public review.
 - If you want to give a friend your tags, **Share your tags** (in the Shared lists tab of `/tags`) makes a block of text you hand over yourself. You choose which families go in, and your notes stay out unless you tick the box. A list you receive is kept separate from your own tags, shows with fainter icons, doesn't set off alerts unless you turn that on, and is never included when you share or back up. Remove it any time with one click.
+
+![The Shared lists tab, with a list opened to show its players](screenshots/11-shared-list.png)
 
 ## Install
 
@@ -154,7 +168,8 @@ PlayerTags/        the addon (this folder is what goes in Interface/AddOns)
 tests/             offline checks that run the addon against a fake game client
 tools/             build_icons.py (regenerates Media/), build_store_art.py (media/), package.sh (release files)
 screenshots/       images used in this README
-media/             the logo for CurseForge and other store art (not in the addon zip)
+media/             the logo for CurseForge, the GitHub social preview (not in the addon zip)
+.previews/         screenshots WowUp shows on the addon's page
 ```
 
 - Run the checks with `lua5.1 tests/run.lua`.
