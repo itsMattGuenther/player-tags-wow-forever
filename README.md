@@ -76,6 +76,10 @@ Want to see them without waiting for the real thing? `/tags test` shows each one
 
 *Hovering over a tagged player: their tags and your note in the tooltip, with tag icons above the target frame.*
 
+<img src="screenshots/12-nameplate-icons.png" alt="Tag icons above a tagged player's name-only nameplate" width="40%">
+
+*With friendly nameplates on, tag icons sit above a tagged player's name, drawn like the game's own names.*
+
 ## Private by design
 
 - Your tags live in your own saved variables file on your computer.
