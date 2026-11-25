@@ -544,12 +544,12 @@ local function sortedPlayers(list)
 	return out
 end
 
-local function listInfo(list)
+local function listInfo(list, short)
 	local bits = {}
 	if ns.IsText(list.from) then bits[#bits + 1] = "from " .. list.from end
 	local count = ns.SharedPlayerCount(list)
 	bits[#bits + 1] = count .. (count == 1 and " player" or " players")
-	if list.added then bits[#bits + 1] = "added " .. ns.Ago(list.added) end
+	if list.added and not short then bits[#bits + 1] = "added " .. ns.Ago(list.added) end
 	return table.concat(bits, " · ")
 end
 
@@ -585,7 +585,7 @@ local function refreshShared()
 	detail:SetShown(not showLists)
 	if not showLists then
 		if not detail.nameEdit:HasFocus() then detail.nameEdit:SetText(openList.name or "") end
-		detail.info:SetText(listInfo(openList))
+		detail.info:SetText(listInfo(openList, true))
 		detail.alerts:SetChecked(openList.alerts == true)
 		detail.removeList:SetLabel(sharedPage.confirm == sharedPage.open and "Sure?" or "Remove list")
 		local members = sortedPlayers(openList)
@@ -700,7 +700,7 @@ local function buildShared(page)
 		sharedPage.view, sharedPage.confirm = "lists", nil
 		refreshShared()
 	end)
-	detail.nameEdit = UI.Edit(detail, 220, 20, "List name")
+	detail.nameEdit = UI.Edit(detail, 200, 20, "List name")
 	detail.nameEdit:SetPoint("LEFT", detail.back, "RIGHT", 14, 0)
 	detail.nameEdit:SetMaxLetters(60)
 	detail.nameEdit.onEnter = function(self)
@@ -710,6 +710,7 @@ local function buildShared(page)
 	detail.nameEdit.onBlur = detail.nameEdit.onEnter
 	detail.info = UI.Text(detail, "GameFontDisableSmall")
 	detail.info:SetPoint("LEFT", detail.nameEdit, "RIGHT", 12, 0)
+	detail.info:SetWordWrap(false)
 	detail.removeList = UI.Button(detail, "Remove list", 100, 22)
 	detail.removeList:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -31)
 	detail.removeList.tip = "Removes this whole list. Your own tags are not touched."
@@ -726,6 +727,8 @@ local function buildShared(page)
 	end)
 	detail.alerts = UI.Check(detail, "Alerts")
 	detail.alerts:SetPoint("RIGHT", detail.removeList, "LEFT", -64, 0)
+	-- The "from ... · N players" text stops short of the Alerts box.
+	detail.info:SetPoint("RIGHT", detail.alerts, "LEFT", -10, 0)
 	detail.alerts.onChange = function(on)
 		if sharedPage.open then ns.SetSharedAlerts(sharedPage.open, on) end
 	end
