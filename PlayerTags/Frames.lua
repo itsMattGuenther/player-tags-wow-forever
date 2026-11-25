@@ -9,16 +9,19 @@ local function isGroupUnit(unit)
 	return unit:match("^party%d$") ~= nil or unit:match("^raid%d+$") ~= nil
 end
 
+-- The icons for a unit's frame (your own tags, then shared ones), or nil.
 local function taggedRecord(unit)
 	if not ns.settings.frames then return nil end
+	if ns.settings.hideInCombat and InCombatLockdown() then return nil end
 	if unit == nil or ns.IsSecret(unit) or type(unit) ~= "string" then return nil end
 	local id = ns.IdentifyUnit(unit)
 	if not id or ns.IsMe(id) then return nil end
 	-- Touch, not just look up: a target or group member is someone you can
 	-- see, so their class and level are brought up to date.
-	local rec = ns.Touch(id)
-	if rec and ns.HasTags(rec) then return rec end
-	return nil
+	local rec, key = ns.Touch(id)
+	local ids, shared = ns.DisplayIds(ns.TagsFor(id, rec, key))
+	if #ids == 0 then return nil end
+	return { ids = ids, shared = shared }
 end
 
 local function rowFor(host, size)
@@ -73,7 +76,8 @@ local function apply(host, unit, size, name, max)
 	end
 	local row = rowFor(host, size)
 	if not row then return end
-	row:SetTags(ns.TagIds(rec), max or 3)
+	row:SetBadgeSize(size)
+	row:SetTags(rec.ids, max or 3, rec.shared)
 	place(row, host, name)
 end
 
@@ -84,10 +88,11 @@ local function targetName(frame)
 end
 
 local function refresh()
+	local size = tonumber(ns.settings.frameIconSize) or 15
 	local target = _G.TargetFrame
-	if target then apply(target, "target", 15, targetName(target), 4) end
+	if target then apply(target, "target", size, targetName(target), 4) end
 	local focus = _G.FocusFrame
-	if focus then apply(focus, "focus", 15, targetName(focus), 4) end
+	if focus then apply(focus, "focus", size, targetName(focus), 4) end
 
 	local party = _G.PartyFrame
 	local pool = party and party.PartyMemberFramePool
@@ -95,7 +100,7 @@ local function refresh()
 		for member in pool:EnumerateActive() do
 			local unit = member.unitToken
 			if unit == nil and member.GetUnit then unit = member:GetUnit() end
-			apply(member, unit, 14, member.Name, 3)
+			apply(member, unit, math.max(10, size - 1), member.Name, 3)
 		end
 	end
 
@@ -107,9 +112,10 @@ local function refresh()
 			rec = taggedRecord(unit)
 		end
 		if rec then
-			local row = rowFor(frame, 12)
+			local row = rowFor(frame, math.max(10, size - 3))
 			if row then
-				row:SetTags(ns.TagIds(rec), 2)
+				row:SetBadgeSize(math.max(10, size - 3))
+				row:SetTags(rec.ids, 2, rec.shared)
 				row:ClearAllPoints()
 				row:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -3, -3)
 			end
@@ -146,6 +152,9 @@ ns.Module("frames", function()
 	ns.On("GROUP_ROSTER_UPDATE", queue, "frames")
 	ns.On("PLAYER_ENTERING_WORLD", queue, "frames")
 	ns.On("PLAYER_REGEN_ENABLED", queue, "frames")
+	ns.On("PLAYER_REGEN_DISABLED", function()
+		if ns.settings.hideInCombat then queue() end
+	end, "frames")
 	ns.On("UNIT_NAME_UPDATE", function(unit)
 		if unit == nil or ns.IsSecret(unit) or type(unit) ~= "string" then return end
 		if unit == "target" or unit == "focus" or isGroupUnit(unit) then queue() end

@@ -433,6 +433,25 @@ function H.install()
 		if u.surname then return u.name .. " " .. u.surname end
 		return u.name
 	end
+	G.UnitInParty = function(token) local u = unit(token) return u ~= nil and u.party == true end
+	G.UnitInRaid = function(token) local u = unit(token) return (u and u.raid) and 1 or nil end
+	G.IsGUIDInGroup = function(guid) return world.groupGuids ~= nil and world.groupGuids[guid] == true end
+	G.IsInInstance = function() return world.instance ~= nil, world.instance or "none" end
+	G.UnitIsEnemy = function(_, token) local u = unit(token) return u ~= nil and u.hostile == true end
+	G.IsShiftKeyDown = function() return world.shift == true end
+	G.StaticPopupDialogs = {}
+	G.StaticPopup_FindVisible = function(which)
+		local f = world.popups and world.popups[which]
+		if f and f:IsShown() then return f end
+		return nil
+	end
+	G.StaticPopup_Show = function(which, text)
+		local f = new("Frame", G.UIParent)
+		f.which, f.text = which, text
+		world.popups = world.popups or {}
+		world.popups[which] = f
+		return f
+	end
 	G.UnitIsAFK = function(token) local u = unit(token) return u ~= nil and u.afk == true end
 	G.UnitIsDND = function(token) local u = unit(token) return u ~= nil and u.dnd == true end
 	G.GetGuildInfo = function(token) local u = unit(token) return u and u.guild end

@@ -21,12 +21,18 @@ local function mark(entry)
 	local info = C_LFGList.GetSearchResultInfo(resultID)
 	if type(info) ~= "table" then return clear(entry) end
 
-	local leaderKey, leaderRec
+	-- Your own tags, and shared lists' tags, for a name on the listing.
+	local function idsFor(key)
+		local ids = ns.DisplayIds(ns.TagsFor({ key = key }, ns.GetRecord(key), key))
+		return ids
+	end
+
+	local leaderKey, leaderIds
 	local leader = info.leaderName
 	if ns.IsText(leader) then
 		leaderKey = ns.Key(leader)
-		leaderRec = ns.GetRecord(leaderKey)
-		if leaderRec and not ns.HasTags(leaderRec) then leaderRec = nil end
+		leaderIds = leaderKey and idsFor(leaderKey)
+		if leaderIds and #leaderIds == 0 then leaderIds = nil end
 	end
 
 	local others = 0
@@ -38,15 +44,14 @@ local function mark(entry)
 			if ns.IsText(name) then
 				local key = ns.Key(name)
 				if key ~= leaderKey then
-					local rec = ns.GetRecord(key)
-					if rec and ns.HasTags(rec) then others = others + 1 end
+					if key and #idsFor(key) > 0 then others = others + 1 end
 				end
 			end
 		end
 	end
 
 	local text = ""
-	if leaderRec then text = ns.TagsEscape(ns.TagIds(leaderRec), 14, 3) end
+	if leaderIds then text = ns.TagsEscape(leaderIds, 14, 3) end
 	if others > 0 then text = text .. " |cffffd100+" .. others .. " tagged|r" end
 	if text == "" then return clear(entry) end
 

@@ -63,6 +63,24 @@ local function register()
 		return setting
 	end
 
+	-- A choice of a few words, shown as a dropdown.
+	local function chooseText(key, name, tip, choices)
+		local setting = Settings.RegisterProxySetting(category, "PLAYERTAGS_" .. key:upper(), Settings.VarType.String, name,
+			ns.defaults[key],
+			function() return ns.settings[key] end,
+			function(value)
+				ns.settings[key] = value
+				changed()
+			end)
+		local function options()
+			local container = Settings.CreateControlTextContainer()
+			for _, c in ipairs(choices) do container:Add(c[1], c[2]) end
+			return container:GetData()
+		end
+		Settings.CreateDropdown(category, setting, options, tip)
+		return setting
+	end
+
 	section("Where tags show")
 	check("tooltip", "Tags in tooltips",
 		"Adds a tagged player's tags, your note and where you tagged them to their tooltip.")
@@ -72,6 +90,12 @@ local function register()
 		"Icons above your target, focus, party and raid frames.")
 	check("finder", "Group Finder marks",
 		"The leader's tags on a listing, and a count of other tagged players in the group.")
+	choose("frameIconSize", "Unit frame icon size", "How big the icons above the target and focus frames are. Party and raid frames follow.",
+		{ { 12, "Small" }, { 15, "Medium" }, { 19, "Large" } })
+	chooseText("tooltipNote", "Notes in tooltips", "Show your note in a tagged player's tooltip always, or only while you hold Shift.",
+		{ { "always", "Always" }, { "shift", "While holding Shift" } })
+	check("hideInCombat", "Hide icons in combat", "Hides tag icons on nameplates and unit frames during fights. They come back when the fight ends.")
+	check("showShared", "Tags from shared lists", "Shows tags from lists other players shared with you, with fainter icons. Manage the lists in the Shared lists tab of /tags.")
 	check("nameplates", "Tag icons on nameplates",
 		"Icons over enemy players' nameplates, and over friendly players if they have nameplates.")
 	choose("plateSize", "Nameplate icon size", "How big the icons over nameplates are.",
@@ -127,12 +151,32 @@ local function register()
 	end
 
 	section("Alerts")
+	chooseText("alertStyle", "Show alerts as", "Where heads-ups appear: the alert box, a line in chat, or both.",
+		{ { "both", "Alert box and chat" }, { "box", "Alert box only" }, { "chat", "Chat only" } })
 	check("groupAlert", "Group join alert",
 		"When someone you tagged joins your group: a short alert box, and a line in chat.")
+	check("nearbyAlert", "Avoid player nearby",
+		"When someone you tagged Avoid shows up near you: their nameplate appears, you point at or target them, or they talk nearby. Not in dungeons or for your own group.")
+	check("inviteWarn", "Tags on group invites",
+		"Shows the inviter's tags and your note under the game's invite box, good tags as well as bad.")
+	check("requestWarn", "Whispers, trades, duels",
+		"Shows your tags under a duel request or the trade window, and a heads-up when someone you tagged Avoid whispers you.")
+	check("lfgAlert", "Good players seeking group",
+		"A line in chat when someone you tagged Good people or Skilled posts in a public channel that they are looking for a group.")
+	choose("alertWait", "Alert again after", "How long before the same player can set off the same alert again.",
+		{ { 5, "5 minutes" }, { 15, "15 minutes" }, { 30, "30 minutes" }, { 60, "1 hour" } })
+	check("alertHoldCombat", "Hold alerts during combat", "Keeps alerts until the fight is over, then shows them.")
 	check("alertSound", "Play a sound for Avoid tags",
-		"The raid warning sound, when someone in your group is tagged Avoid.")
+		"The raid warning sound with alerts about someone you tagged Avoid.")
 	button("Alert position", "Move", function() ns.MoveAlert() end,
 		"Shows the alert box so you can drag it where you want it.")
+
+	section("After a group or a death")
+	chooseText("runCard", "Tag the group afterwards",
+		"When a group of 5 minutes or more ends, a small window lists who was in it, with your most-used tags as buttons.",
+		{ { "always", "After every group" }, { "dungeons", "After dungeons only" }, { "off", "Never" } })
+	check("killerCard", "Tag who killed you",
+		"After a death in world PvP, a small window lists the enemy players who were near you, with Ganker and Griefer as buttons.")
 
 	section("Windows")
 	do

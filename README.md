@@ -8,11 +8,11 @@ You run a dungeon with a healer who carries the whole group, and a week later yo
 
 Player Tags fixes that. Tag a player in a couple of clicks (Helpful, Great Healer, Ninja Looter, whatever fits) and add a note if you like. The next time you cross paths, their tags show up in their tooltip, next to their name in chat, on their target and group frames, and on their Group Finder listing.
 
-Everything stays on your computer. Nobody else can see your tags, and other players are never told you tagged them.
+Everything stays on your computer. Nobody else can see your tags unless you choose to give them a copy, and other players are never told you tagged them.
 
 **[Download the latest version](https://github.com/itsMattGuenther/player-tags-wow-forever/releases/latest/download/PlayerTags.zip)** · [All releases](https://github.com/itsMattGuenther/player-tags-wow-forever/releases)
 
-> **Beta.** Version 1.0.0-beta.4 is built for WoW: Forever (interface 16001) and has been played in game. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
+> **Beta.** Version 1.0.0-beta.5 is built for WoW: Forever (interface 16001) and has been played in game. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
 
 ## What you get
 
@@ -40,6 +40,21 @@ You can rename them, hide the ones you don't use, and make your own.
 - **Group Finder:** the leader's tags on a listing, and a count of other tagged players in the group.
 - **Nameplates:** up to three icons by default (Avoid tags first), over enemy players in the open world.
 
+**Heads-ups at the moment you decide.**
+
+- **Group invites:** the inviter's tags and your note appear under the game's invite box, good tags as well as bad, before you click Accept.
+- **Duels and trades:** the same, under a duel request or the trade window.
+- **Whispers:** a heads-up when someone you tagged Avoid whispers you.
+- **Someone you avoid is nearby:** an alert when an Avoid-tagged player's nameplate appears, you point at or target them, or they talk nearby. It skips your own group and dungeons, and waits 15 minutes before alerting about the same player again.
+- **Good players looking for a group:** a line in chat, with their name to click, when someone you tagged Good people or Skilled posts in a public channel that they're looking for a group.
+
+**Tag people while you still remember.**
+
+- **After a group:** when a group of 5 minutes or more ends, a small window lists everyone who was in it (including anyone who left early) with your most-used tags as buttons.
+- **After a world PvP death:** a small window lists the enemy players who were near you, with Ganker and Griefer ready to click.
+
+Want to see them without waiting for the real thing? `/tags test` shows each one with made-up players, and nothing is saved.
+
 **Your list.** `/tags` opens everyone you've tagged. You can search by name, tag or note, filter by family, and click a row to edit it. Names are in class colours. A grey name means the game hasn't told the addon that player's class yet. It fills in when you point at them or target them, and usually when they talk in chat.
 
 ![A tagged player's tooltip and target frame](screenshots/02-tooltip-and-target-frame.png)
@@ -49,8 +64,9 @@ You can rename them, hide the ones you don't use, and make your own.
 ## Private by design
 
 - Your tags live in your own saved variables file on your computer.
-- The addon contains no code that sends messages to other players. There's no shared blocklist, nothing to sync, and no account.
+- The addon contains no code that sends messages to other players. There's no public blocklist, nothing syncs, and there's no account.
 - There are no scores or ratings. A tag is a note to yourself, not a public review.
+- If you want to give a friend your tags, **Share your tags** (in the Shared lists tab of `/tags`) makes a block of text you hand over yourself. You choose which families go in, and your notes stay out unless you tick the box. A list you receive is kept separate from your own tags, shows with fainter icons, doesn't set off alerts unless you turn that on, and is never included when you share or back up. Remove it any time with one click.
 
 ## Install
 
@@ -78,7 +94,8 @@ Use the zip from the Releases page, not GitHub's green **Code → Download ZIP**
 | Minimap button | Left-click opens your list, right-click tags your target, drag to move it around the minimap. |
 | `/tags options` | The settings, which are also in the game's own menu: Esc → Options → AddOns → Player Tags. |
 | `/tags tags` | The tag editor. |
-| `/tags export`, `/tags import` | Back up your list as text, or restore it. |
+| `/tags export`, `/tags import` | Back up your list as text, or restore it. Import also takes a list someone shared with you. |
+| `/tags test` | Shows each heads-up and card with made-up players, for example `/tags test invite`. Nothing is saved. |
 | `/tags status` | Shows what's loaded and any problems the addon caught. |
 
 The windows look and behave like the game's own: Esc closes them, and the settings let you change their size or switch the tagging popup to a compact, icons-only version. The list and the popup open in the middle of the screen the first time. Drag them anywhere and they'll open there from then on. If you'd rather the popup opened at your mouse pointer, there's an option for that.
@@ -94,6 +111,9 @@ These limits come from the game, not the addon:
 - **Nameplates inside dungeons and raids:** Blizzard locks friendly nameplates there, so group frames carry the tags instead.
 - **Chat inside instances:** the game hides who's talking from addons, so chat icons don't appear there.
 - **Friendly nameplates in the open world:** friendly players don't have nameplates by default, so nameplate icons appear over enemy players only. Friendly players' tags still show in tooltips, chat, and on target and group frames. An option, off by default, gives friendly players name-only nameplates so icons can sit above them too. Those names are drawn to look like the game's own: the same blue, font and guild line, and never cut short. You can switch them to class colours or white, or change their size. Unticking it restores your previous settings.
+- **Who's nearby:** the game only tells addons a player is near when their nameplate appears, you point at or target them, or they talk nearby. Same-faction players without nameplates are only noticed those ways.
+- **Duel requests** give only a name, so the warning matches it against your list as written.
+- **After a PvP death** the window lists the enemy players who were near you, not necessarily the one who landed the killing blow. The game doesn't tell addons that.
 
 **Backing up:** `/tags export` gives you your whole list as text you can save anywhere. `/tags import` brings it back. The data itself is in `_forever_/WTF/Account/<your account>/SavedVariables/PlayerTags.lua`.
 
@@ -115,11 +135,15 @@ PlayerTags/        the addon (this folder is what goes in Interface/AddOns)
   Core.lua         safe calls, events, module startup
   Tags.lua         families and the 22 starter tags
   Database.lua     saved data, player identity, tagging
+  Shared.lua       lists other players shared with you, kept apart from yours
   Icons.lua        icon atlas, inline icons, badges
   Widgets.lua      windows and controls built from the game's own templates
   Alerts.lua       the alert box
   QuickTag.lua     the tagging popup
   Nameplates.lua   Tooltip.lua  Chat.lua  Menu.lua  Frames.lua  Group.lua  Finder.lua
+  Warnings.lua     tags beside invites, duels and trades; whispers; good players seeking a group
+  Nearby.lua       the heads-up when someone you avoid is near
+  Cards.lua        the windows after a group and after a PvP death
   Share.lua        export / import
   Window.lua       the /tags window
   Settings.lua     the page in the game's Options, under AddOns

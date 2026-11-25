@@ -17,32 +17,17 @@ end
 
 local function announce(list)
 	local summary = (#list == 1) and "1 tagged player in your group" or (#list .. " tagged players in your group")
-	ns.Print(summary)
-
-	local warn = false
-	local chat = _G.DEFAULT_CHAT_FRAME
-	for _, rec in ipairs(list) do
-		local ids = ns.TagIds(rec)
-		local line = "   " .. ns.TagsEscape(ids, 0) .. " " .. ns.ColoredName(rec) .. "  " .. ns.TagNames(ids)
-		if ns.IsText(rec.note) then line = line .. "  |cffa7afb8\"" .. rec.note .. "\"|r" end
-		if chat and chat.AddMessage then chat:AddMessage(line) end
-		for _, tagId in ipairs(ids) do
-			local tag = ns.GetTag(tagId)
-			if tag and tag.family == "avoid" then warn = true end
-		end
+	local rows, chat, warn = {}, { "|cffffd100Player Tags:|r " .. summary }, false
+	for _, info in ipairs(list) do
+		local ids = ns.DisplayIds(info)
+		local name = info.rec and ns.ColoredName(info.rec) or ns.ClassColorCode(info.class) .. (info.name or "?") .. "|r"
+		rows[#rows + 1] = { ids = ids, text = name .. "  |cffa7afb8" .. ns.TagNames(ids) .. "|r" }
+		local line = "   " .. ns.TagsEscape(ids, 0) .. " " .. name .. "  " .. ns.TagNames(ids)
+		if info.rec and ns.IsText(info.rec.note) then line = line .. "  |cffa7afb8\"" .. info.rec.note .. "\"|r" end
+		chat[#chat + 1] = line
+		if ns.ShouldWarn(info) then warn = true end
 	end
-
-	-- The alert box, not the game's error-message area: that is where
-	-- "Not enough mana" shows, and a heads-up there is easy to miss.
-	local rows = {}
-	for _, rec in ipairs(list) do
-		local ids = ns.TagIds(rec)
-		rows[#rows + 1] = { ids = ids, text = ns.ColoredName(rec) .. "  |cffa7afb8" .. ns.TagNames(ids) .. "|r" }
-	end
-	if ns.ShowAlert then ns.ShowAlert(summary, rows) end
-	if warn and ns.settings.alertSound and PlaySound and _G.SOUNDKIT and _G.SOUNDKIT.RAID_WARNING then
-		pcall(PlaySound, _G.SOUNDKIT.RAID_WARNING)
-	end
+	ns.Notify({ kind = "group", title = summary, rows = rows, chat = chat, avoid = warn })
 end
 
 local function scan()
@@ -55,9 +40,20 @@ local function scan()
 		local id = ns.IdentifyUnit(unit)
 		if id and not ns.IsMe(id) then
 			local rec, key = ns.Touch(id)
-			if rec and ns.HasTags(rec) and not announced[key] then
-				announced[key] = true
-				fresh[#fresh + 1] = rec
+			local info = ns.TagsFor(id, rec, key)
+			-- Your own tags always count. A shared list only counts when
+			-- you turned its alerts on.
+			local counts = info and (#info.ids > 0 or info.sharedAvoid)
+			if counts then
+				for _, from in ipairs(info.shared) do
+					if not from.alerts then from.ids = {} end
+				end
+			end
+			local slot = key or id.key
+			if counts and not announced[slot] then
+				announced[slot] = true
+				info.name, info.class = id.name, id.class
+				fresh[#fresh + 1] = info
 			end
 		end
 	end

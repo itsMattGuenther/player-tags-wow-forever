@@ -115,6 +115,14 @@ function ns.CreateBadge(parent, size)
 		for i = 1, 4 do self.edges[i]:SetAlpha(dim and 0.25 or 1) end
 	end
 
+	--- A tag from someone's shared list, not your own: a fainter border
+	--- and icon, so the two can be told apart at a glance.
+	function f:SetShared(shared)
+		self.glyph:SetAlpha(shared and 0.7 or 1)
+		for i = 1, 4 do self.edges[i]:SetAlpha(shared and 0.35 or 1) end
+		self.bg:SetAlpha(shared and 0.5 or 1)
+	end
+
 	return f
 end
 
@@ -143,8 +151,9 @@ function ns.CreateBadgeRow(parent, size, spacing)
 		self:SetHeight(newSize)
 	end
 
-	--- Shows the given tag ids, at most `max` of them. Hides itself when empty.
-	function row:SetTags(ids, max)
+	--- Shows the given tag ids, at most `max` of them. Hides itself when
+	--- empty. `shared` marks ids that come from someone's shared list.
+	function row:SetTags(ids, max, shared)
 		local n = ids and #ids or 0
 		local shown = (max and n > max) and max or n
 		for i = 1, shown do
@@ -155,6 +164,7 @@ function ns.CreateBadgeRow(parent, size, spacing)
 				self.badges[i] = badge
 			end
 			badge:SetTag(ids[i])
+			badge:SetShared(shared ~= nil and shared[ids[i]] == true)
 		end
 		for i = shown + 1, #self.badges do self.badges[i]:Hide() end
 

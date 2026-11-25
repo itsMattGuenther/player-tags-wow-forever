@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Player Tags
 ## Notes: Tag the players you meet and see those tags on nameplates, tooltips, chat and group frames. Private: nothing leaves your PC.
-## Version: 1.0.0-beta.4
+## Version: 1.0.0-beta.5
 ## Author: Matt Guenther
 ## X-Website: https://github.com/itsMattGuenther/player-tags-wow-forever
 ## SavedVariables: PlayerTagsDB
@@ -13,6 +13,7 @@
 Core.lua
 Tags.lua
 Database.lua
+Shared.lua
 Icons.lua
 Widgets.lua
 Alerts.lua
@@ -24,6 +25,9 @@ Menu.lua
 Frames.lua
 Group.lua
 Finder.lua
+Warnings.lua
+Nearby.lua
+Cards.lua
 Share.lua
 Window.lua
 Settings.lua

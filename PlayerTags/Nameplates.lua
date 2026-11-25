@@ -42,9 +42,16 @@ local function update(unit)
 		return
 	end
 
+	if ns.settings.hideInCombat and InCombatLockdown() then
+		hideRow(plate)
+		return
+	end
+
 	local id = ns.IdentifyUnit(unit)
-	local rec = id and ns.Touch(id)
-	if not rec or not ns.HasTags(rec) then
+	local rec, key
+	if id then rec, key = ns.Touch(id) end
+	local ids, shared = ns.DisplayIds(id and ns.TagsFor(id, rec, key))
+	if #ids == 0 then
 		hideRow(plate)
 		return
 	end
@@ -56,7 +63,7 @@ local function update(unit)
 		rows[plate] = row
 	end
 	row:SetBadgeSize(ns.settings.plateSize)
-	row:SetTags(ns.TagIds(rec), ns.settings.plateMax)
+	row:SetTags(ids, ns.settings.plateMax, shared)
 	row:ClearAllPoints()
 	row:SetPoint("BOTTOM", anchorFor(plate), "TOP", 0, 3)
 end
@@ -300,6 +307,11 @@ ns.Module("nameplates", function()
 	-- Names can arrive a moment after the plate does.
 	ns.On("UNIT_NAME_UPDATE", function(unit)
 		if unit ~= nil and not ns.IsSecret(unit) and active[unit] then update(unit) end
+	end, "nameplates")
+
+	-- Icons that hide during fights come back when the fight ends.
+	ns.On("PLAYER_REGEN_DISABLED", function()
+		if ns.settings.hideInCombat then refreshAll() end
 	end, "nameplates")
 
 	ns.On("PLAYER_REGEN_ENABLED", function()

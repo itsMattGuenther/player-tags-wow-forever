@@ -125,3 +125,105 @@ function ns.IsAlertShown()
 end
 
 ns.Listen("SETTINGS_CHANGED", function() UI.ApplyScale(box) end, "alerts")
+
+---------------------------------------------------------------------------
+-- Notify: the one door every heads-up goes through, so they all behave the
+-- same: a per-player wait before the same alert repeats, the box or chat
+-- (or both) as chosen in settings, the Avoid sound, and holding alerts
+-- until a fight ends when that is switched on.
+---------------------------------------------------------------------------
+local lastShown = {}  -- kind .. key -> time
+local held = {}       -- alerts waiting for the end of combat
+
+local function deliver(alert)
+	local style = ns.settings.alertStyle or "both"
+	if style ~= "chat" then ns.ShowAlert(alert.title, alert.rows) end
+	if style ~= "box" and alert.chat then
+		local frame = _G.DEFAULT_CHAT_FRAME
+		if frame and frame.AddMessage then
+			for _, line in ipairs(alert.chat) do frame:AddMessage(line) end
+		end
+	end
+	if alert.avoid and ns.settings.alertSound and PlaySound and _G.SOUNDKIT and _G.SOUNDKIT.RAID_WARNING then
+		pcall(PlaySound, _G.SOUNDKIT.RAID_WARNING)
+	end
+end
+
+--- Shows a heads-up. alert = {
+---   kind     "nearby", "invite", "whisper", "lfg", ...
+---   key      the player's record key, for the wait before repeating
+---   wait     seconds before the same kind repeats for that player (optional)
+---   title    the box's headline
+---   rows     the box's lines: { ids = {tag ids}, text = "..." }
+---   chat     lines for the chat frame
+---   avoid    true plays the Avoid sound when that is on
+--- }
+--- Returns true when it was shown or held for later.
+function ns.Notify(alert)
+	if type(alert) ~= "table" then return false end
+	if alert.key and alert.wait then
+		local slot = (alert.kind or "") .. ":" .. alert.key
+		local now = GetTime()
+		if lastShown[slot] and now - lastShown[slot] < alert.wait then return false end
+		lastShown[slot] = now
+	end
+	if ns.settings.alertHoldCombat and InCombatLockdown() then
+		if #held < 6 then held[#held + 1] = alert end
+		return true
+	end
+	deliver(alert)
+	return true
+end
+
+--- Forgets the waits (used by the test command so samples always show).
+function ns.ResetAlertWaits()
+	lastShown = {}
+end
+
+ns.On("PLAYER_REGEN_ENABLED", function()
+	if #held == 0 then return end
+	local waiting = held
+	held = {}
+	for _, alert in ipairs(waiting) do ns.Safe("alerts", deliver, alert) end
+end, "alerts")
+
+---------------------------------------------------------------------------
+-- What an alert or warning says about a player: their tags, your note and
+-- where you tagged them. Shared lists add a line saying whose list it is.
+---------------------------------------------------------------------------
+local DIM = "|cffa7afb8"
+
+--- Lines describing a player for alerts and warnings, as { ids, text } rows.
+--- `info` is what ns.TagsFor returns.
+function ns.DescribeRows(info)
+	local rows = {}
+	if not info then return rows end
+	local own = info.ids or {}
+	if #own > 0 then
+		rows[#rows + 1] = { ids = own, text = ns.TagNames(own) }
+	end
+	local rec = info.rec
+	if rec and ns.IsText(rec.note) then
+		rows[#rows + 1] = { text = "|cffffffff\"" .. rec.note .. "\"|r" }
+	end
+	local latest = rec and ns.LatestTag(rec)
+	if latest and latest.t then
+		local where = "Tagged " .. ns.Ago(latest.t)
+		if ns.IsText(latest.zone) then where = where .. " in " .. latest.zone end
+		rows[#rows + 1] = { text = DIM .. where .. "|r" }
+	end
+	for _, from in ipairs(info.shared or {}) do
+		rows[#rows + 1] = { ids = from.ids, text = DIM .. "From " .. from.list .. ":|r " .. ns.TagNames(from.ids) }
+	end
+	return rows
+end
+
+--- The same, as chat lines with the addon's prefix in front of the first.
+function ns.DescribeChat(headline, info)
+	local lines = { "|cffffd100Player Tags:|r " .. headline }
+	for _, row in ipairs(ns.DescribeRows(info)) do
+		local icons = row.ids and (ns.TagsEscape(row.ids, 0) .. " ") or ""
+		lines[#lines + 1] = "   " .. icons .. row.text
+	end
+	return lines
+end

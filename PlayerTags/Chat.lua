@@ -21,17 +21,18 @@ local function onSender(decorated, ...)
 			rec = ns.GetRecord(key)
 		end
 	end
-	if not rec then return nil end
 
 	-- A chat line names the sender's GUID, and the game knows their class
 	-- from it. Someone tagged from a name gets their class this way. The
 	-- repaint waits a moment so it never runs inside the chat frame's work.
-	if ns.Learn(rec, key, guid) then
+	if rec and ns.Learn(rec, key, guid) then
 		ns.Debounce("chat learned", 0.5, function() ns.Fire("RECORD_CHANGED") end)
 	end
 
-	if not ns.settings.chat or not ns.IsText(decorated) or not ns.HasTags(rec) then return nil end
-	return ns.TagsEscape(ns.TagIds(rec), 0, 3) .. decorated
+	if not ns.settings.chat or not ns.IsText(decorated) then return nil end
+	local ids = ns.DisplayIds(ns.TagsFor({ guid = guid, key = key }, rec, key))
+	if #ids == 0 then return nil end
+	return ns.TagsEscape(ids, 0, 3) .. decorated
 end
 
 ns.Module("chat", function()

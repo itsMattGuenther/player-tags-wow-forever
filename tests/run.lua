@@ -31,7 +31,7 @@ local TESSA = { name = "Tessa", surname = "Brightwell", guid = "Player-1-TESSA",
 local VELRA = { name = "Velra", surname = "Duskwhisper", guid = "Player-1-VELRA", class = "ROGUE", level = 36, race = "Orc", faction = "Horde" }
 
 section("startup")
-check("all files listed in the toc load", #files == 19, #files)
+check("all files listed in the toc load", #files == 23, #files)
 H.fire("ADDON_LOADED", "PlayerTags")
 H.fire("PLAYER_LOGIN")
 check("database created", type(PlayerTagsDB) == "table" and type(PlayerTagsDB.players) == "table")
@@ -39,7 +39,7 @@ check("knows who I am", ns.me == "Matt Tester", ns.me)
 for _, name in ipairs(ns.moduleOrder) do
 	check("module " .. name .. " is running", (ns.moduleState[name] or ""):sub(1, 2) == "ok", ns.moduleState[name])
 end
-check("eight surfaces registered", #ns.moduleOrder == 8, #ns.moduleOrder)
+check("every surface registered", #ns.moduleOrder == 11, #ns.moduleOrder)
 check("slash commands registered", SLASH_PLAYERTAGS1 == "/tags" and SLASH_PLAYERTAGSTAG1 == "/tag" and type(SlashCmdList.PLAYERTAGS) == "function")
 check("key binding functions exist", type(PlayerTags_QuickTag) == "function" and type(PlayerTags_ToggleWindow) == "function")
 
@@ -479,7 +479,7 @@ at = H.anchor(PlayerTagsFrame)
 check("the window opens in the middle of the screen the first time", at.point == "CENTER" and at.rel == UIParent and at.relPoint == "CENTER" and at.x == 0 and at.y == 0, tostring(at.point) .. " " .. tostring(at.x) .. "," .. tostring(at.y))
 check("only one anchor holds the window", #PlayerTagsFrame.__points == 1, #PlayerTagsFrame.__points)
 check("the window is the game's standard frame", PlayerTagsFrame.CloseButton ~= nil and PlayerTagsFrame.Inset ~= nil and PlayerTagsFrame:GetTitleText():GetText() == "Player Tags")
-check("two tabs along the bottom", #PlayerTagsFrame.Tabs == 2 and PlayerTagsFrame.selectedTab == 1, PlayerTagsFrame.selectedTab)
+check("three tabs along the bottom", #PlayerTagsFrame.Tabs == 3 and PlayerTagsFrame.selectedTab == 1, PlayerTagsFrame.selectedTab)
 H.run(PlayerTagsFrame.Tabs[2], "OnClick")
 check("the Tags tab is chosen from its tab", PlayerTagsFrame.selectedTab == 2)
 ns.ShowWindow("tags")
@@ -831,6 +831,314 @@ PlayerTags_QuickTag()
 H.settings.byVariable.PLAYERTAGS_SCALE:SetValue(1)
 ns.ToggleWindow()
 check("settings ran without problems", #ns.errors == 0, ns.errors[1])
+
+section("warnings at the moment it matters")
+world.combat, world.inGroup, world.instance = false, false, nil
+world.units.party1, world.units.party2, world.units.target, world.units.mouseover = nil, nil, nil, nil
+local GRIM = { name = "Grimbold", surname = "Ashjaw", guid = "Player-1-GRIM", class = "WARRIOR", level = 40, race = "Orc", hostile = true }
+local LYSA = { name = "Lysa", surname = "Thornfield", guid = "Player-1-LYSA", class = "PRIEST", level = 30, race = "Human" }
+local grim = ns.IdentifyName("Grimbold Ashjaw", "Player-1-GRIM")
+ns.SetTag(grim, "ganker", true)
+ns.SetNote(grim, "Camped the flight path")
+local lysa = ns.IdentifyName("Lysa Thornfield", "Player-1-LYSA")
+ns.SetTag(lysa, "healer", true)
+local function alertTitle() return ns.IsAlertShown() and PlayerTagsAlert.title:GetText() or "" end
+local warning = function() return _G.PlayerTagsWarning end
+
+-- group invites: the event names the inviter's GUID
+H.fire("PARTY_INVITE_REQUEST", "Grimbold Ashjaw", false, false, false, true, false, false, "Player-1-GRIM", false)
+local invitePopup = StaticPopup_Show("PARTY_INVITE", "Grimbold Ashjaw invites you to join a group.")
+world.lastSound = nil
+H.flush()
+check("an invite from a tagged player shows their tags under the invite box", warning() and warning():IsShown() and warning().anchor == invitePopup and warning().title:GetText():find("invites you", 1, true) ~= nil)
+check("and plays the Avoid sound", world.lastSound == 8959)
+invitePopup:Hide()
+check("the warning goes when the invite box does", (function() H.run(warning(), "OnUpdate") return not warning():IsShown() end)())
+H.fire("PARTY_INVITE_REQUEST", "Lysa Thornfield", false, false, false, true, false, false, "Player-1-LYSA", false)
+invitePopup = StaticPopup_Show("PARTY_INVITE", "Lysa Thornfield invites you.")
+world.lastSound = nil
+H.flush()
+check("good tags show on invites too, without the warning sound", warning():IsShown() and world.lastSound == nil)
+invitePopup:Hide()
+H.run(warning(), "OnUpdate")
+H.fire("PARTY_INVITE_REQUEST", "Odo Fennick", false, false, false, true, false, false, "Player-1-ODO", false)
+StaticPopup_Show("PARTY_INVITE", "Odo invites you.")
+H.flush()
+check("an untagged inviter shows nothing", not warning():IsShown())
+world.popups.PARTY_INVITE:Hide()
+H.fire("PARTY_INVITE_REQUEST", H.SECRET, false, false, false, true, false, false, H.SECRET, false)
+H.flush()
+check("a hidden inviter causes no errors", #ns.errors == 0, ns.errors[1])
+
+-- duels give a name only; trades name the other player as the unit "NPC"
+H.fire("DUEL_REQUESTED", "Grimbold Ashjaw")
+local duelPopup = StaticPopup_Show("DUEL_REQUESTED", "Grimbold Ashjaw")
+H.flush()
+check("a duel request shows their tags under the duel box", warning():IsShown() and warning().anchor == duelPopup)
+duelPopup:Hide()
+H.run(warning(), "OnUpdate")
+TradeFrame = H.new("Frame")
+world.units.NPC = GRIM
+H.fire("TRADE_SHOW")
+check("the trade window shows their tags under it", warning():IsShown() and warning().anchor == TradeFrame and warning().title:GetText():find("trade", 1, true) ~= nil)
+TradeFrame:Hide()
+H.run(warning(), "OnUpdate")
+world.units.NPC = nil
+
+-- whispers from someone tagged Avoid
+ns.ResetAlertWaits()
+world.chat = {}
+H.fire("CHAT_MSG_WHISPER", "hey", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 10, "Player-1-GRIM")
+check("a whisper from someone tagged Avoid sets off a heads-up", alertTitle():find("whispering you", 1, true) ~= nil and chatHas("whispering you"))
+world.chat = {}
+H.fire("CHAT_MSG_WHISPER", "hey again", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 11, "Player-1-GRIM")
+check("but only once in a while", not chatHas("whispering you"))
+world.chat = {}
+H.fire("CHAT_MSG_WHISPER", "hi", "Lysa Thornfield", "", "", "", "", 0, 0, "", 0, 12, "Player-1-LYSA")
+check("whispers from good players are left alone", not chatHas("whispering you"))
+
+-- good players looking for a group, in public channels
+world.chat = {}
+H.fire("CHAT_MSG_CHANNEL", "LFM SFK need tank", "Lysa Thornfield", "", "4. LookingForGroup", "", "", 26, 4, "LookingForGroup", 0, 13, "Player-1-LYSA")
+check("a good player posting LFM gets a line with their name", chatHas("is looking for a group") and chatHas("|Hplayer:Lysa Thornfield"))
+world.chat = {}
+ns.ResetAlertWaits()
+H.fire("CHAT_MSG_CHANNEL", "WTS mageweave cloth", "Lysa Thornfield", "", "2. Trade", "", "", 2, 2, "Trade - City", 0, 14, "Player-1-LYSA")
+check("trade chatter does not count", not chatHas("is looking for a group"))
+H.fire("CHAT_MSG_CHANNEL", "LFG anything", "Grimbold Ashjaw", "", "4. LookingForGroup", "", "", 26, 4, "LookingForGroup", 0, 15, "Player-1-GRIM")
+check("Avoid-tagged players are never pointed out as good", not chatHas("is looking for a group"))
+check("the group-search check knows the usual words", ns.LooksLikeGroupSearch("LF2M BFD") and ns.LooksLikeGroupSearch("anyone need a healer?") and not ns.LooksLikeGroupSearch("selling linen"))
+H.fire("CHAT_MSG_CHANNEL", H.SECRET, H.SECRET, "", "x", "", "", 0, 0, "x", 0, 16, H.SECRET)
+check("hidden channel messages cause no errors", #ns.errors == 0, ns.errors[1])
+
+section("avoid player nearby")
+ns.ResetAlertWaits()
+ns.StopMovingAlert()
+world.chat = {}
+world.units.nameplate7 = GRIM
+H.plate("nameplate7")
+H.fire("NAME_PLATE_UNIT_ADDED", "nameplate7")
+check("their nameplate appearing sets off a heads-up", alertTitle():find("is nearby", 1, true) ~= nil and chatHas("Camped the flight path"))
+world.chat = {}
+H.fire("NAME_PLATE_UNIT_REMOVED", "nameplate7")
+H.fire("NAME_PLATE_UNIT_ADDED", "nameplate7")
+check("it waits before alerting about the same player again", not chatHas("is nearby"))
+ns.ResetAlertWaits()
+world.instance = "party"
+world.chat = {}
+H.fire("NAME_PLATE_UNIT_ADDED", "nameplate7")
+check("not inside dungeons", not chatHas("is nearby"))
+world.instance = nil
+world.groupGuids = { ["Player-1-GRIM"] = true }
+H.fire("CHAT_MSG_SAY", "hello", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 17, "Player-1-GRIM")
+check("not for your own group (the group alert covers them)", not chatHas("nearby"))
+world.groupGuids = nil
+H.fire("CHAT_MSG_YELL", "HELLO", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 18, "Player-1-GRIM")
+check("talking nearby counts too", chatHas("is talking nearby"))
+ns.ResetAlertWaits()
+ns.settings.alertHoldCombat = true
+world.combat = true
+world.chat = {}
+H.fire("CHAT_MSG_SAY", "hi", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 19, "Player-1-GRIM")
+check("with hold in combat on, a fight holds the alert", not chatHas("talking nearby"))
+world.combat = false
+H.fire("PLAYER_REGEN_ENABLED")
+check("and shows it when the fight ends", chatHas("talking nearby"))
+ns.settings.alertHoldCombat = false
+ns.ResetAlertWaits()
+ns.settings.alertStyle = "chat"
+PlayerTagsAlert:Hide()
+world.chat = {}
+H.fire("CHAT_MSG_SAY", "hi", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 20, "Player-1-GRIM")
+check("chat-only alerts skip the box", chatHas("talking nearby") and not ns.IsAlertShown())
+ns.settings.alertStyle = "both"
+ns.settings.nearbyAlert = false
+ns.ResetAlertWaits()
+world.chat = {}
+H.fire("CHAT_MSG_SAY", "hi", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 21, "Player-1-GRIM")
+check("the nearby alert can be turned off", not chatHas("nearby"))
+ns.settings.nearbyAlert = true
+H.fire("NAME_PLATE_UNIT_ADDED", H.SECRET)
+H.fire("CHAT_MSG_SAY", H.SECRET, H.SECRET, "", "", "", "", 0, 0, "", 0, 22, H.SECRET)
+check("hidden units and senders cause no errors", #ns.errors == 0, ns.errors[1])
+H.fire("NAME_PLATE_UNIT_REMOVED", "nameplate7")
+world.units.nameplate7 = nil
+
+section("tag your group afterwards")
+local runCard = function() return _G.PlayerTagsRunCard end
+world.inGroup = true
+world.units.party1 = LYSA
+world.units.party2 = { name = "Bramm", surname = "Coppervein", guid = "Player-1-BRAMM", class = "WARRIOR" }
+H.fire("GROUP_ROSTER_UPDATE")
+H.flush()
+world.units.party2 = nil -- left early
+H.fire("GROUP_ROSTER_UPDATE")
+world.now = world.now + 600
+world.inGroup = false
+world.units.party1 = nil
+H.fire("GROUP_LEFT")
+check("when a group of 10 minutes ends, a card lists who was in it", runCard() and runCard():IsShown())
+local cardRows = H.find(runCard(), function(o) return rawget(o, "buttons") ~= nil and o:IsShown() end)
+local bramRow, lysaRow
+for _, row in ipairs(cardRows) do
+	if row.id and row.id.key == "bramm coppervein" then bramRow = row end
+	if row.id and row.id.key == "lysa thornfield" then lysaRow = row end
+end
+check("including the player who left early", bramRow ~= nil and lysaRow ~= nil, #cardRows)
+local firstButton = bramRow and bramRow.buttons[1]
+H.run(firstButton, "OnClick")
+check("a tag clicked on the card is saved for that player", ns.GetRecord("bramm coppervein") and ns.GetRecord("bramm coppervein").tags[firstButton.tagId] ~= nil and firstButton.on)
+check("the card offers your most-used tags", #bramRow.buttons >= 5)
+runCard():Hide()
+world.inGroup = true
+world.units.party1 = LYSA
+H.fire("GROUP_ROSTER_UPDATE")
+world.now = world.now + 60
+world.inGroup = false
+world.units.party1 = nil
+H.fire("GROUP_LEFT")
+check("a short group gets no card", not runCard():IsShown())
+ns.settings.runCard = "dungeons"
+world.inGroup = true
+world.units.party1 = LYSA
+H.fire("GROUP_ROSTER_UPDATE")
+world.now = world.now + 900
+world.inGroup = false
+world.units.party1 = nil
+H.fire("GROUP_LEFT")
+check("set to dungeons only, an open-world group gets no card", not runCard():IsShown())
+ns.settings.runCard = "always"
+ns.DeleteRecord("bramm coppervein")
+
+section("tag who killed you")
+local killerCard = function() return _G.PlayerTagsKillerCard end
+world.units.nameplate8 = { name = "Shade", surname = "Vexmoor", guid = "Player-1-SHADE", class = "ROGUE", hostile = true }
+H.plate("nameplate8")
+H.fire("NAME_PLATE_UNIT_ADDED", "nameplate8")
+H.fire("PLAYER_DEAD")
+H.flush()
+check("after a death, a card lists enemy players who were near", killerCard() and killerCard():IsShown())
+local killerRows = H.find(killerCard(), function(o) return rawget(o, "buttons") ~= nil and o:IsShown() end)
+check("with Ganker among the buttons", killerRows[1] and killerRows[1].id.key == "shade vexmoor" and killerRows[1].buttons[1].tagId == "ganker")
+killerCard():Hide()
+world.now = world.now + 60
+H.fire("PLAYER_DEAD")
+H.flush()
+check("enemies seen more than 30 seconds ago are not listed", not killerCard():IsShown())
+world.instance = "pvp"
+H.fire("NAME_PLATE_UNIT_ADDED", "nameplate8")
+H.fire("PLAYER_DEAD")
+H.flush()
+check("not in battlegrounds or dungeons", not killerCard():IsShown())
+world.instance = nil
+H.fire("NAME_PLATE_UNIT_REMOVED", "nameplate8")
+world.units.nameplate8 = nil
+check("cards ran without problems", #ns.errors == 0, ns.errors[1])
+
+section("sharing")
+local ownBefore = ns.PlayerCount()
+local shareText, shareCount = ns.ExportShare({ families = { avoid = true }, notes = false })
+check("a share holds only the families chosen", shareText:find("Grimbold", 1, true) ~= nil and not shareText:find("Lysa", 1, true))
+check("and no notes unless asked", not shareText:find("flight", 1, true))
+check("and nothing about where or when you tagged them", not shareText:find("Riverglades", 1, true) and not shareText:find("Matt Tester~", 1, true))
+local withNotes = ns.ExportShare({ notes = true })
+check("notes go in when asked", withNotes:find("flight", 1, true) ~= nil)
+-- someone else's share, with sneaky text in it
+local theirs = table.concat({
+	"PlayerTags share 1;Kael",
+	"P;Vex|cffff0000Red|r Morrow;Player-1-00AB;ROGUE;rude,ninja;|Hitem:1234|h[Free gold]|h",
+	"P;Grimbold Ashjaw;Player-1-GRIM;WARRIOR;leaver;",
+	"P;Pip Quill;;MAGE;c~Bard~info~25;",
+}, "\n")
+local summary, listId = ns.Import(theirs, "Kael's list")
+check("a share imports as a separate list", summary ~= nil and ns.db.shared[listId] ~= nil and ns.PlayerCount() == ownBefore, summary)
+local sharedList = ns.db.shared[listId]
+local vex = sharedList.players["vexred morrow"]
+check("colour and link codes are taken out whole", vex ~= nil and vex.name == "VexRed Morrow" and vex.note == "[Free gold]", vex and (vex.name .. " / " .. tostring(vex.note)))
+check("game codes are stripped from names and notes", (function()
+	for _, p in pairs(sharedList.players) do
+		if (p.name and p.name:find("|", 1, true)) or (p.note and p.note:find("|", 1, true)) then return false end
+	end
+	return true
+end)())
+check("custom tags you don't have are left out", sharedList.players["pip quill"] == nil)
+local info = ns.TagsFor(ns.IdentifyName("Grimbold Ashjaw", "Player-1-GRIM"))
+check("shared tags sit beside your own, marked with the list", info and #info.ids == 1 and info.shared[1] and info.shared[1].list == "Kael's list" and info.shared[1].ids[1] == "leaver")
+local ids, sharedSet = ns.DisplayIds(info)
+check("icons show your own first, then shared ones marked as shared", ids[1] == "ganker" and ids[2] == "leaver" and sharedSet.leaver == true and not sharedSet.ganker)
+GameTooltip.__lines = {}
+world.units.mouseover = GRIM
+post(GameTooltip, { guid = "Player-1-GRIM" })
+check("the tooltip says whose list a shared tag is from", table.concat(GameTooltip.__lines, "\n"):find("From Kael's list", 1, true) ~= nil)
+world.units.mouseover = nil
+local again = ns.ExportShare({})
+check("a list you were given is never in what you share", not again:find("Leaver", 1, true) and not again:find("leaver", 1, true) and not again:find("Vex", 1, true))
+check("or in a backup", not ns.Export():find("Vex", 1, true))
+-- a shared-only Avoid player does not alert until the list's alerts are on
+ns.ResetAlertWaits()
+world.chat = {}
+H.fire("CHAT_MSG_SAY", "hi", "VexRed Morrow", "", "", "", "", 0, 0, "", 0, 30, "Player-1-00AB")
+check("shared lists don't set off alerts by default", not chatHas("nearby"))
+ns.SetSharedAlerts(listId, true)
+H.fire("CHAT_MSG_SAY", "hi", "VexRed Morrow", "", "", "", "", 0, 0, "", 0, 31, "Player-1-00AB")
+check("until you turn alerts on for that list", chatHas("talking nearby"))
+ns.ShowWindow("shared")
+local listRow = H.find(PlayerTagsFrame, function(o) return rawget(o, "listId") == listId and o:IsShown() end)[1]
+check("the Shared lists tab shows the list", listRow ~= nil and listRow.name:GetText() == "Kael's list")
+H.run(listRow.remove, "OnClick")
+H.run(listRow.remove, "OnClick")
+check("Remove takes the whole list away, and nothing of yours", ns.db.shared[listId] == nil and ns.PlayerCount() == ownBefore and ns.TagsFor(ns.IdentifyName("Vexred Morrow")) == nil)
+ns.ToggleWindow()
+check("junk is refused", ns.Import("PlayerTags share 1;x\nnot a line") == nil)
+ns.ShowShare("share")
+check("the share dialog opens with its choices", PlayerTagsShare:IsShown() and PlayerTagsShare.options:IsShown() and PlayerTagsShare.edit:GetText():sub(1, 16) == "PlayerTags share")
+ns.ShowShare("import")
+check("the import dialog asks for a list name", PlayerTagsShare.listName:IsShown())
+PlayerTagsShare:Hide()
+check("sharing ran without problems", #ns.errors == 0, ns.errors[1])
+
+section("where tags show: new choices")
+ns.settings.hideInCombat = true
+world.combat = true
+world.units.nameplate9 = GRIM
+local hplate = H.plate("nameplate9")
+H.fire("NAME_PLATE_UNIT_ADDED", "nameplate9")
+check("icons can hide during fights", H.badgeRow(hplate) == nil or not H.badgeRow(hplate):IsShown())
+world.combat = false
+H.fire("PLAYER_REGEN_ENABLED")
+check("and come back after", H.badgeRow(hplate) ~= nil and H.badgeRow(hplate):IsShown())
+ns.settings.hideInCombat = false
+H.fire("NAME_PLATE_UNIT_REMOVED", "nameplate9")
+world.units.nameplate9 = nil
+ns.settings.tooltipNote = "shift"
+GameTooltip.__lines = {}
+world.units.mouseover = GRIM
+post(GameTooltip, { guid = "Player-1-GRIM" })
+check("notes can wait for Shift", table.concat(GameTooltip.__lines, "\n"):find("Hold Shift", 1, true) ~= nil and not table.concat(GameTooltip.__lines, "\n"):find("flight", 1, true))
+world.shift = true
+GameTooltip.__lines = {}
+post(GameTooltip, { guid = "Player-1-GRIM" })
+check("and show while Shift is held", table.concat(GameTooltip.__lines, "\n"):find("flight", 1, true) ~= nil)
+world.shift, world.units.mouseover = false, nil
+ns.settings.tooltipNote = "always"
+
+section("/tags test")
+local countBefore = ns.PlayerCount()
+for _, what in ipairs({ "invite", "duel", "trade", "whisper", "nearby", "lfg", "group", "run", "killer" }) do
+	SlashCmdList.PLAYERTAGS("test " .. what)
+end
+check("every test runs without problems", #ns.errors == 0, ns.errors[1])
+check("and saves nothing", ns.PlayerCount() == countBefore)
+local testRow = H.find(PlayerTagsRunCard, function(o) return rawget(o, "buttons") ~= nil and o:IsShown() end)[1]
+H.run(testRow.buttons[1], "OnClick")
+check("tags clicked on a test card are not saved", ns.PlayerCount() == countBefore and testRow.buttons[1].on)
+world.chat = {}
+SlashCmdList.PLAYERTAGS("test")
+check("/tags test alone lists what can be tested", chatHas("invite, duel, trade"))
+PlayerTagsRunCard:Hide()
+PlayerTagsKillerCard:Hide()
+ns.DeleteRecord("grimbold ashjaw")
+ns.DeleteRecord("lysa thornfield")
 
 section("saved data stays clean")
 local function plain(value, path)

@@ -30,6 +30,21 @@ local DEFAULTS = {
 	popupAtCursor = false,  -- tagging popup opens at the mouse instead of its own spot
 	compactPopup = false,   -- tagging popup shows icons only, names on hover
 	scale = 1,              -- size of the list, the popup and the alert box
+	-- alerts
+	alertStyle = "both",    -- "both" | "box" | "chat"
+	alertWait = 15,         -- minutes before the same player alerts again
+	alertHoldCombat = false, -- keep alerts until a fight ends
+	nearbyAlert = true,     -- someone you tagged Avoid is nearby
+	inviteWarn = true,      -- tags beside a group invite
+	requestWarn = true,     -- whispers, trades and duels from Avoid-tagged players
+	lfgAlert = true,        -- good players posting that they are looking for a group
+	runCard = "always",     -- after a group: "always" | "dungeons" | "off"
+	killerCard = true,      -- after a death in world PvP, tag who was around
+	-- where tags show
+	hideInCombat = false,   -- hide nameplate and frame icons during fights
+	frameIconSize = 15,     -- tag icons on the target and focus frames
+	tooltipNote = "always", -- "always" | "shift": the note in tooltips
+	showShared = true,      -- show tags from shared lists
 }
 
 function ns.InitDB()
@@ -59,6 +74,7 @@ function ns.InitDB()
 	if type(t.override) ~= "table" then t.override = {} end
 	if type(t.hidden) ~= "table" then t.hidden = {} end
 	if type(db.cvars) ~= "table" then db.cvars = {} end
+	if type(db.shared) ~= "table" then db.shared = {} end
 
 	ns.db = db
 	ns.settings = db.settings
@@ -75,6 +91,7 @@ function ns.InitDB()
 	end
 
 	ns.RebuildTags()
+	if ns.RebuildShared then ns.RebuildShared() end
 end
 
 ---------------------------------------------------------------------------

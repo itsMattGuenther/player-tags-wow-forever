@@ -530,11 +530,109 @@ end
 refreshers.tags = refreshTags
 
 ---------------------------------------------------------------------------
+-- Shared lists tab: lists other players gave you, kept apart from yours
+---------------------------------------------------------------------------
+local SHARED_ROWS = 10
+local sharedPage = { rows = {}, confirm = nil }
+
+local function refreshShared()
+	local page = pages.shared
+	if not page then return end
+	local lists = ns.SharedLists()
+	for i, row in ipairs(sharedPage.rows) do
+		local item = lists[i]
+		if item then
+			local list = item.list
+			row.listId = item.id
+			row.name:SetText(list.name or "Shared list")
+			local bits = {}
+			if ns.IsText(list.from) then bits[#bits + 1] = "from " .. list.from end
+			local count = ns.SharedPlayerCount(list)
+			bits[#bits + 1] = count .. (count == 1 and " player" or " players")
+			if list.added then bits[#bits + 1] = "added " .. ns.Ago(list.added) end
+			row.info:SetText(table.concat(bits, " · "))
+			row.alerts:SetChecked(list.alerts == true)
+			local confirming = sharedPage.confirm == item.id
+			row.remove:SetLabel(confirming and "Sure?" or "Remove")
+			row:Show()
+		else
+			row.listId = nil
+			row:Hide()
+		end
+	end
+	if #lists == 0 then page.empty:Show() else page.empty:Hide() end
+	page.count:SetText(#lists .. (#lists == 1 and " shared list" or " shared lists"))
+end
+
+local function buildShared(page)
+	local inset = frame.Inset
+	local hint = UI.Text(page, "GameFontHighlightSmall",
+		"Tags other players shared with you. They stay separate from your own and are never in what you export or share.")
+	hint:SetPoint("TOPLEFT", frame, "TOPLEFT", 74, -30)
+	hint:SetPoint("RIGHT", frame, "RIGHT", -12, 0)
+	hint:SetJustifyV("TOP")
+
+	for i = 1, SHARED_ROWS do
+		local row = CreateFrame("Frame", nil, page)
+		row:SetHeight(38)
+		row:SetPoint("TOPLEFT", inset, "TOPLEFT", 10, -(8 + (i - 1) * 40))
+		row:SetPoint("RIGHT", inset, "RIGHT", -10, 0)
+		row.name = UI.Text(row, "GameFontHighlight")
+		row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 2, -3)
+		row.name:SetWidth(420)
+		row.name:SetWordWrap(false)
+		row.info = UI.Text(row, "GameFontDisableSmall")
+		row.info:SetPoint("TOPLEFT", row.name, "BOTTOMLEFT", 0, -3)
+		row.info:SetWidth(420)
+		row.alerts = UI.Check(row, "Alerts")
+		row.alerts:SetPoint("RIGHT", row, "RIGHT", -150, 0)
+		row.alerts.onChange = function(on)
+			if row.listId then ns.SetSharedAlerts(row.listId, on) end
+		end
+		row.remove = UI.Button(row, "Remove", 80, 22)
+		row.remove:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+		row.remove.tip = "Removes this whole list. Your own tags are not touched."
+		row.remove:SetScript("OnClick", function()
+			if not row.listId then return end
+			if sharedPage.confirm == row.listId then
+				sharedPage.confirm = nil
+				ns.RemoveSharedList(row.listId)
+			else
+				sharedPage.confirm = row.listId
+			end
+			refreshShared()
+		end)
+		sharedPage.rows[i] = row
+	end
+
+	page.empty = UI.Text(page, "GameFontDisable",
+		"No shared lists. If someone shares their tags with you, paste their text into Import.")
+	page.empty:SetPoint("TOP", inset, "TOP", 0, -80)
+	page.empty:SetWidth(460)
+	page.empty:SetJustifyH("CENTER")
+
+	page.count = UI.Text(page, "GameFontHighlightSmall")
+	page.count:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 106, UI.BAR_TEXT_Y)
+
+	local import = UI.Button(page, "Import", 80, 22)
+	import:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, UI.BAR_Y)
+	import.tip = "Paste a list someone shared with you."
+	import:SetScript("OnClick", function() ns.ShowShare("import") end)
+	local shareButton = UI.Button(page, "Share your tags", 130, 22)
+	shareButton:SetPoint("RIGHT", import, "LEFT", -2, 0)
+	shareButton.tip = "Your own tags as text you can give to a friend. You choose what goes in."
+	shareButton:SetScript("OnClick", function() ns.ShowShare("share") end)
+end
+
+refreshers.shared = refreshShared
+
+---------------------------------------------------------------------------
 -- Window shell
 ---------------------------------------------------------------------------
 local TABS = {
 	{ id = "players", label = "Players", build = buildPlayers },
 	{ id = "tags", label = "Tags", build = buildTags },
+	{ id = "shared", label = "Shared lists", build = buildShared },
 }
 
 local function selectTab(id)
@@ -597,6 +695,7 @@ function ns.ShowWindow(tab, search)
 	if frame:IsShown() then selectTab(currentTab) else frame:Show() end
 	-- The game's Settings panel shares this window's layer; opened from
 	-- there, the list must come out on top of it.
+	sharedPage.confirm = nil
 	frame:Raise()
 	-- The game can need a moment to look up a player it has not seen this
 	-- session, so ask once more shortly after the list opens.
@@ -652,9 +751,30 @@ local function buildShare()
 	share.hint:SetPoint("RIGHT", share, "RIGHT", -12, 0)
 	share.hint:SetJustifyV("TOP")
 
+	-- Share: what goes in. Import: a name for a shared list.
+	share.options = CreateFrame("Frame", nil, share)
+	share.options:SetPoint("TOPLEFT", share.Inset, "TOPLEFT", 6, -4)
+	share.options:SetPoint("RIGHT", share.Inset, "RIGHT", -6, 0)
+	share.options:SetHeight(56)
+	share.familyChecks = {}
+	for i, family in ipairs(ns.FAMILIES) do
+		local c = UI.Check(share.options, family.name)
+		c:SetPoint("TOPLEFT", share.options, "TOPLEFT", (i - 1) * 125, 0)
+		c.family = family.id
+		c:SetChecked(true)
+		c.onChange = function() ns.ShowShare("share", true) end
+		share.familyChecks[i] = c
+	end
+	share.notesCheck = UI.Check(share.options, "Include my notes")
+	share.notesCheck:SetPoint("TOPLEFT", share.options, "TOPLEFT", 0, -26)
+	share.notesCheck.onChange = function() ns.ShowShare("share", true) end
+	share.listName = UI.Edit(share, 300, 20, "Name for a shared list (optional)")
+	share.listName:SetPoint("TOPLEFT", share.Inset, "TOPLEFT", 12, -8)
+
 	local scroll = CreateFrame("ScrollFrame", nil, share)
 	scroll:SetPoint("TOPLEFT", share.Inset, "TOPLEFT", 8, -8)
 	scroll:SetPoint("BOTTOMRIGHT", share.Inset, "BOTTOMRIGHT", -8, 8)
+	share.scroll = scroll
 	scroll:EnableMouse(true)
 	scroll:EnableMouseWheel(true)
 
@@ -696,7 +816,7 @@ local function buildShare()
 	share.action:SetPoint("BOTTOMRIGHT", share, "BOTTOMRIGHT", -10, UI.BAR_Y)
 	share.action:SetScript("OnClick", function()
 		if share.mode == "import" then
-			local summary, problem = ns.Import(edit:GetText())
+			local summary, problem = ns.Import(edit:GetText(), share.listName:GetText())
 			if summary then
 				share.message:SetText("|cff20ff20" .. summary .. "|r")
 			else
@@ -709,23 +829,55 @@ local function buildShare()
 	end)
 end
 
---- Opens the export or import dialog.
-function ns.ShowShare(mode)
+-- The text box starts lower when there are options above it.
+local function placeText(top)
+	share.scroll:ClearAllPoints()
+	share.scroll:SetPoint("TOPLEFT", share.Inset, "TOPLEFT", 8, -top)
+	share.scroll:SetPoint("BOTTOMRIGHT", share.Inset, "BOTTOMRIGHT", -8, 8)
+end
+
+--- Opens the dialog: "export" (a backup of your list), "share" (your own
+--- tags for someone else, with choices), or "import" (either kind).
+--- `keep` redraws a share after a choice changes without moving focus.
+function ns.ShowShare(mode, keep)
 	if not share then buildShare() end
 	share.mode = mode
 	share.message:SetText("")
+	share.options:Hide()
+	share.listName:Hide()
 	if mode == "import" then
 		share:SetTitle("Import")
-		share.hint:SetText("Paste a Player Tags export below, then press Import. Your own tags and notes are kept; only what is missing gets added.")
+		share.hint:SetText("Paste a Player Tags backup or a shared list below, then press Import. A backup merges into your list; a shared list is kept separate.")
 		share.action:SetLabel("Import")
+		share.listName:SetText("")
+		share.listName:Show()
+		placeText(34)
 		share.edit:SetText("")
 		share:Show()
 		share.edit:SetFocus()
+	elseif mode == "share" then
+		local families = {}
+		for _, c in ipairs(share.familyChecks) do
+			if c:GetChecked() then families[c.family] = true end
+		end
+		local text, count = ns.ExportShare({ families = families, notes = share.notesCheck:GetChecked() })
+		share:SetTitle("Share your tags")
+		share.hint:SetText(count .. (count == 1 and " player. " or " players. ") .. "Only tags you made go in, never lists you were given. Copy it with Ctrl+C and give it to whoever you like.")
+		share.action:SetLabel("Select all")
+		share.options:Show()
+		placeText(62)
+		share.edit:SetText(text)
+		share:Show()
+		if not keep then
+			share.edit:SetFocus()
+			share.edit:HighlightText()
+		end
 	else
 		local text, count = ns.Export()
 		share:SetTitle("Export")
-		share.hint:SetText(count .. (count == 1 and " player. " or " players. ") .. "Press Ctrl+C to copy, then paste it into a text file to keep.")
+		share.hint:SetText(count .. (count == 1 and " player. " or " players. ") .. "A backup of your own list. Press Ctrl+C to copy, then paste it into a text file to keep.")
 		share.action:SetLabel("Select all")
+		placeText(8)
 		share.edit:SetText(text)
 		share:Show()
 		share.edit:SetFocus()
