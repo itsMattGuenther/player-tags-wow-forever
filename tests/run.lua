@@ -456,7 +456,7 @@ local summary, reason = ns.Import(text)
 check("import succeeds", summary ~= nil, reason)
 check("import restores every player", ns.PlayerCount() == count, ns.PlayerCount())
 local back = ns.GetRecord("gorrim ashmantle")
-check("tags, note and facts survive the round trip", back and back.tags.rude and back.tags.tank and back.note == "semi;colon, comma ~ tilde | pipe 100%" and back.class == "WARRIOR" and back.guid == "Player-1-GORRIM")
+check("tags, note and facts survive the round trip", back and back.tags.rude and back.tags.tank and back.note == "semi;colon, comma ~ tilde || pipe 100%" and back.class == "WARRIOR" and back.guid == "Player-1-GORRIM")
 check("tag details survive", back.tags.tank.zone == "Riverglades" and back.tags.tank.by == "Matt Tester" and type(back.tags.tank.t) == "number")
 local tessaBack = ns.GetRecord("tessa brightwell")
 local recreated = ns.FindTag("Guild Recruit")
@@ -901,6 +901,7 @@ check("whispers from good players are left alone", not chatHas("whispering you")
 world.chat = {}
 H.fire("CHAT_MSG_CHANNEL", "LFM SFK need tank", "Lysa Thornfield", "", "4. LookingForGroup", "", "", 26, 4, "LookingForGroup", 0, 13, "Player-1-LYSA")
 check("a good player posting LFM gets a line with their name", chatHas("is looking for a group") and chatHas("|Hplayer:Lysa Thornfield"))
+check("as a chat line only, never the alert box", not alertTitle():find("looking for a group", 1, true))
 world.chat = {}
 ns.ResetAlertWaits()
 H.fire("CHAT_MSG_CHANNEL", "WTS mageweave cloth", "Lysa Thornfield", "", "2. Trade", "", "", 2, 2, "Trade - City", 0, 14, "Player-1-LYSA")
@@ -908,6 +909,7 @@ check("trade chatter does not count", not chatHas("is looking for a group"))
 H.fire("CHAT_MSG_CHANNEL", "LFG anything", "Grimbold Ashjaw", "", "4. LookingForGroup", "", "", 26, 4, "LookingForGroup", 0, 15, "Player-1-GRIM")
 check("Avoid-tagged players are never pointed out as good", not chatHas("is looking for a group"))
 check("the group-search check knows the usual words", ns.LooksLikeGroupSearch("LF2M BFD") and ns.LooksLikeGroupSearch("anyone need a healer?") and not ns.LooksLikeGroupSearch("selling linen"))
+check("and not trade requests like LF enchanter or need a port", not ns.LooksLikeGroupSearch("LF enchanter for crusader") and not ns.LooksLikeGroupSearch("need a port to SW"))
 H.fire("CHAT_MSG_CHANNEL", H.SECRET, H.SECRET, "", "x", "", "", 0, 0, "x", 0, 16, H.SECRET)
 check("hidden channel messages cause no errors", #ns.errors == 0, ns.errors[1])
 
@@ -958,6 +960,12 @@ world.chat = {}
 H.fire("CHAT_MSG_SAY", "hi", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 21, "Player-1-GRIM")
 check("the nearby alert can be turned off", not chatHas("nearby"))
 ns.settings.nearbyAlert = true
+ns.ResetAlertWaits()
+ns.SetTag(grim, "griefer", true)
+world.chat = {}
+H.fire("CHAT_MSG_SAY", "hi", "Grimbold Ashjaw", "", "", "", "", 0, 0, "", 0, 23, "Player-1-GRIM")
+check("tagging someone does not set off an alert about them a moment later", not chatHas("nearby"))
+ns.SetTag(grim, "griefer", false)
 H.fire("NAME_PLATE_UNIT_ADDED", H.SECRET)
 H.fire("CHAT_MSG_SAY", H.SECRET, H.SECRET, "", "", "", "", 0, 0, "", 0, 22, H.SECRET)
 check("hidden units and senders cause no errors", #ns.errors == 0, ns.errors[1])
@@ -1008,6 +1016,16 @@ world.units.party1 = nil
 H.fire("GROUP_LEFT")
 check("set to dungeons only, an open-world group gets no card", not runCard():IsShown())
 ns.settings.runCard = "always"
+world.inGroup = true
+world.instance = "pvp"
+world.units.party1 = LYSA
+H.fire("GROUP_ROSTER_UPDATE")
+world.now = world.now + 900
+world.inGroup = false
+world.instance = nil
+world.units.party1 = nil
+H.fire("GROUP_LEFT")
+check("battleground groups get no card", not runCard():IsShown())
 ns.DeleteRecord("bramm coppervein")
 
 section("tag who killed you")
@@ -1090,6 +1108,15 @@ H.run(listRow.remove, "OnClick")
 check("Remove takes the whole list away, and nothing of yours", ns.db.shared[listId] == nil and ns.PlayerCount() == ownBefore and ns.TagsFor(ns.IdentifyName("Vexred Morrow")) == nil)
 ns.ToggleWindow()
 check("junk is refused", ns.Import("PlayerTags share 1;x\nnot a line") == nil)
+local firstId = select(2, ns.Import("PlayerTags share 1;Kael\nP;Pip Quill;;MAGE;helpful;", "Kael's list"))
+local secondSummary, secondId = ns.Import("PlayerTags share 1;Kael\nP;Pip Quill;;MAGE;helpful,patient;", "Kael's list")
+check("the same list again replaces the old copy", firstId == secondId and secondSummary:find("Updated", 1, true) ~= nil and #ns.SharedLists() == 1)
+ns.RemoveSharedList(secondId)
+local backup = "PlayerTags export 1\nP;Rook|cffff0000 Hale;Player-1-ROOKX;WARRIOR;30;;;note |Hitem:1|h[x]|h;helpful~1~Zone|T:1|t~Me"
+ns.Import(backup)
+local rook = ns.GetRecord("rook hale")
+check("a backup from someone else is cleaned the same way", rook ~= nil and not rook.name:find("|c", 1, true) and rook.note == "note [x]" and rook.tags.helpful.zone == "Zone", rook and rook.note)
+ns.DeleteRecord("rook hale")
 ns.ShowShare("share")
 check("the share dialog opens with its choices", PlayerTagsShare:IsShown() and PlayerTagsShare.options:IsShown() and PlayerTagsShare.edit:GetText():sub(1, 16) == "PlayerTags share")
 ns.ShowShare("import")
@@ -1128,6 +1155,7 @@ for _, what in ipairs({ "invite", "duel", "trade", "whisper", "nearby", "lfg", "
 	SlashCmdList.PLAYERTAGS("test " .. what)
 end
 check("every test runs without problems", #ns.errors == 0, ns.errors[1])
+check("tests use the addon's own stand-in box, not the game's popups", next(StaticPopupDialogs) == nil and PlayerTagsTestBox ~= nil)
 check("and saves nothing", ns.PlayerCount() == countBefore)
 local testRow = H.find(PlayerTagsRunCard, function(o) return rawget(o, "buttons") ~= nil and o:IsShown() end)[1]
 H.run(testRow.buttons[1], "OnClick")

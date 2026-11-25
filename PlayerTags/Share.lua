@@ -105,7 +105,7 @@ function ns.Import(text, listName)
 		local kind = fields[1]
 
 		if kind == "T" then
-			local theirId, name = dec(fields[2]), dec(fields[3])
+			local theirId, name = dec(fields[2]), ns.CleanText(dec(fields[3]), 24)
 			if theirId and name then
 				local mine = ns.FindTag(name)
 				local existing = mine and ns.GetTag(mine)
@@ -121,8 +121,12 @@ function ns.Import(text, listName)
 			end
 
 		elseif kind == "P" then
-			local name = dec(fields[2])
-			local id = name and ns.IdentifyName(name, dec(fields[3]))
+			-- A backup can come from anyone, so free text is cleaned of the
+			-- game's colour, icon and link codes on the way in.
+			local name = ns.CleanText(dec(fields[2]), 60)
+			local guid = dec(fields[3])
+			if guid and not guid:match("^Player%-%d+%-%w+$") then guid = nil end
+			local id = name and ns.IdentifyName(name, guid)
 			if not id then
 				skipped = skipped + 1
 			else
@@ -140,12 +144,12 @@ function ns.Import(text, listName)
 						local theirId = dec(bits[1])
 						local tagId = theirId and (idMap[theirId] or theirId)
 						if tagId and ns.GetTag(tagId) and not rec.tags[tagId] then
-							rec.tags[tagId] = { t = tonumber(dec(bits[2]) or "") or time(), zone = dec(bits[3]), by = dec(bits[4]) }
+							rec.tags[tagId] = { t = tonumber(dec(bits[2]) or "") or time(), zone = ns.CleanText(dec(bits[3]), 60), by = ns.CleanText(dec(bits[4]), 60) }
 							gained = true
 						end
 					end
 				end
-				local note = dec(fields[8])
+				local note = ns.CleanText(dec(fields[8]), 255)
 				if note and not ns.IsText(rec.note) then
 					rec.note = note
 					gained = true
@@ -162,11 +166,12 @@ function ns.Import(text, listName)
 					end
 					if not rec.guid and id.guid then rec.guid = id.guid end
 					if rec.guid then ns.guidIndex[rec.guid] = key end
-					if not rec.class then rec.class = dec(fields[4]) end
+					local class = dec(fields[4])
+					if not rec.class and class and class:match("^%u+$") then rec.class = class end
 					if not rec.level then rec.level = tonumber(dec(fields[5]) or "") end
 					local seen = tonumber(dec(fields[6]) or "")
 					if seen and (not rec.seen or seen > rec.seen) then
-						rec.seen, rec.seenZone = seen, dec(fields[7])
+						rec.seen, rec.seenZone = seen, ns.CleanText(dec(fields[7]), 60)
 					end
 				end
 			end
@@ -270,7 +275,7 @@ function ns.ImportShare(text, listName)
 			local key = name and ns.Key(name)
 			if key then
 				local guid = dec(fields[3])
-				if guid and not guid:match("^Player%-%d+%-%x+$") then guid = nil end
+				if guid and not guid:match("^Player%-%d+%-%w+$") then guid = nil end
 				local class = dec(fields[4])
 				if class and not class:match("^%u+$") then class = nil end
 				local tags = {}
@@ -290,11 +295,20 @@ function ns.ImportShare(text, listName)
 	end
 	if count == 0 then return nil, "That share has no players in it." end
 
-	local listId = "l" .. time() .. "-" .. math.random(1000, 9999)
+	-- The same list again (same name, same sender) replaces the old copy,
+	-- keeping your alerts choice for it.
+	local listId, replaced
+	for existingId, existing in pairs(ns.db.shared) do
+		if existing.name == list.name and existing.from == list.from then
+			listId, replaced = existingId, true
+			list.alerts = existing.alerts
+		end
+	end
+	listId = listId or ("l" .. time() .. "-" .. math.random(1000, 9999))
 	ns.db.shared[listId] = list
 	ns.RebuildShared()
 	ns.Fire("RECORD_CHANGED")
-	local summary = string.format("Added \"%s\": %d players. It stays separate from your own tags.", list.name, count)
+	local summary = string.format((replaced and "Updated" or "Added") .. " \"%s\": %d players. It stays separate from your own tags.", list.name, count)
 	if unknownTags > 0 then summary = summary .. " " .. unknownTags .. " custom tags you don't have were left out." end
 	if cut then summary = summary .. " Only the first " .. limits.players .. " players were kept." end
 	return summary, listId

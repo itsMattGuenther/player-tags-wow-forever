@@ -56,15 +56,28 @@ local function samplePlayer(good)
 	return { rec = rec, key = "velra duskwhisper", ids = { "leaver", "ninja" }, shared = {}, avoid = true, sharedAvoid = false }
 end
 
-local TEST_DIALOG = "PLAYERTAGS_TEST"
-
--- A stand-in for the game's own invite, duel or trade box.
+-- A stand-in for the game's own invite, duel or trade box. It is the
+-- addon's own frame, never the game's popup system, which addons should
+-- not borrow.
+local standIn
 local function testBox(text)
-	if not (StaticPopupDialogs and StaticPopup_Show) then return nil end
-	StaticPopupDialogs[TEST_DIALOG] = {
-		text = "%s", button1 = OKAY or "Okay", timeout = 0, whileDead = true, hideOnEscape = true,
-	}
-	return StaticPopup_Show(TEST_DIALOG, text)
+	if not standIn then
+		standIn = ns.UI.Window("PlayerTagsTestBox", "Test", 340, 120, false)
+		standIn:SetFrameStrata("DIALOG")
+		standIn:SetPoint("TOP", UIParent, "TOP", 0, -160)
+		standIn.text = ns.UI.Text(standIn, "GameFontHighlight")
+		standIn.text:SetPoint("TOPLEFT", standIn.Inset, "TOPLEFT", 10, -10)
+		standIn.text:SetPoint("RIGHT", standIn.Inset, "RIGHT", -10, 0)
+		standIn.text:SetJustifyH("CENTER")
+		local okay = ns.UI.Button(standIn, OKAY or "Okay", 90, 22)
+		okay:SetPoint("BOTTOMRIGHT", standIn, "BOTTOMRIGHT", -10, ns.UI.BAR_Y)
+		okay:SetScript("OnClick", function() standIn:Hide() end)
+		table.insert(UISpecialFrames, "PlayerTagsTestBox")
+	end
+	standIn:SetTitle("Stand-in for the game's box")
+	standIn.text:SetText(text)
+	standIn:Show()
+	return standIn
 end
 
 local TESTS = {

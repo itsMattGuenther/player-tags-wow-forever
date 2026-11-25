@@ -533,14 +533,15 @@ refreshers.tags = refreshTags
 -- Shared lists tab: lists other players gave you, kept apart from yours
 ---------------------------------------------------------------------------
 local SHARED_ROWS = 10
-local sharedPage = { rows = {}, confirm = nil }
+local sharedPage = { rows = {}, confirm = nil, offset = 0 }
 
 local function refreshShared()
 	local page = pages.shared
 	if not page then return end
 	local lists = ns.SharedLists()
+	sharedPage.offset = clamp(sharedPage.offset, 0, math.max(0, #lists - SHARED_ROWS))
 	for i, row in ipairs(sharedPage.rows) do
-		local item = lists[i]
+		local item = lists[i + sharedPage.offset]
 		if item then
 			local list = item.list
 			row.listId = item.id
@@ -613,6 +614,12 @@ local function buildShared(page)
 
 	page.count = UI.Text(page, "GameFontHighlightSmall")
 	page.count:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 106, UI.BAR_TEXT_Y)
+
+	page:EnableMouseWheel(true)
+	page:SetScript("OnMouseWheel", function(_, delta)
+		sharedPage.offset = sharedPage.offset - delta
+		refreshShared()
+	end)
 
 	local import = UI.Button(page, "Import", 80, 22)
 	import:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, UI.BAR_Y)

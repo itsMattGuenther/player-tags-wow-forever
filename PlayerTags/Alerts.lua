@@ -136,7 +136,7 @@ local lastShown = {}  -- kind .. key -> time
 local held = {}       -- alerts waiting for the end of combat
 
 local function deliver(alert)
-	local style = ns.settings.alertStyle or "both"
+	local style = alert.style or ns.settings.alertStyle or "both"
 	if style ~= "chat" then ns.ShowAlert(alert.title, alert.rows) end
 	if style ~= "box" and alert.chat then
 		local frame = _G.DEFAULT_CHAT_FRAME
@@ -178,6 +178,12 @@ end
 --- Forgets the waits (used by the test command so samples always show).
 function ns.ResetAlertWaits()
 	lastShown = {}
+end
+
+--- Starts a player's wait as if an alert had just shown, so tagging
+--- someone does not set off an alert about them a moment later.
+function ns.StartAlertWait(kind, key)
+	if key then lastShown[kind .. ":" .. key] = GetTime() end
 end
 
 ns.On("PLAYER_REGEN_ENABLED", function()

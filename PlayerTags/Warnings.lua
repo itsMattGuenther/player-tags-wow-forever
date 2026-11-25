@@ -182,13 +182,20 @@ end
 -- the message reads like a group search (or it is the LookingForGroup
 -- channel), so trade chatter does not set it off.
 ---------------------------------------------------------------------------
-local LFG_WORDS = { "lfg", "lfm", "lf%d", "lf ", "looking for", "need a", "need %d", "need tank", "need heal", "need dps" }
+-- Words that mean a group search, not a trade ("LF enchanter", "need a
+-- port" are not).
+local LFG_PATTERNS = {
+	"%f[%w]lfg%f[%W]", "%f[%w]lf%d*m%f[%W]", "%f[%w]lf%s?%d%f[%W]",
+	"looking for a? ?group", "looking for more", "%f[%w]lf a? ?group",
+	"%f[%w]lf a? ?tank", "%f[%w]lf a? ?heal", "%f[%w]lf a? ?dps", "%f[%w]lf a? ?party",
+	"need a? ?tank", "need a? ?heal", "need %d* ?dps", "need %d+ more",
+}
 
 local function looksLikeGroupSearch(text, channel)
 	if type(channel) == "string" and channel:lower():find("lookingforgroup", 1, true) then return true end
 	local lower = " " .. text:lower() .. " "
-	for _, word in ipairs(LFG_WORDS) do
-		if lower:find(" " .. word) then return true end
+	for _, pattern in ipairs(LFG_PATTERNS) do
+		if lower:find(pattern) then return true end
 	end
 	return false
 end
@@ -213,7 +220,7 @@ local function onChannel(text, sender, _, _, _, _, _, _, channelBaseName, _, _, 
 	local short = sender:match("^([^%-]+)") or sender
 	local link = "|Hplayer:" .. sender .. "|h[" .. (info.rec and info.rec.name or short) .. "]|h"
 	ns.Notify({
-		kind = "lfg", key = info.key or id.key, wait = 30 * 60,
+		kind = "lfg", key = info.key or id.key, wait = 30 * 60, style = "chat",
 		title = colored(info, short) .. " is looking for a group",
 		rows = { { ids = good, text = ns.TagNames(good) } },
 		chat = { "|cffffd100Player Tags:|r " .. ns.TagsEscape(good, 0) .. " " .. link

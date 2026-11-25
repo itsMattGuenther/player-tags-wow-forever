@@ -196,7 +196,7 @@ end
 local MIN_GROUP_TIME = 5 * 60
 local runCard
 local roster, rosterOrder = {}, {}
-local groupSince, wasInDungeon, dungeonName = nil, false, nil
+local groupSince, wasInDungeon, dungeonName, wasInPvP = nil, false, nil, false
 local pendingCard = nil
 
 local function groupUnits()
@@ -214,6 +214,7 @@ local function noteRoster()
 	if not IsInGroup() then return end
 	groupSince = groupSince or GetTime()
 	local ok, inside, kind = pcall(IsInInstance)
+	if ok and inside == true and (kind == "pvp" or kind == "arena") then wasInPvP = true end
 	if ok and inside == true and (kind == "party" or kind == "raid") then
 		wasInDungeon = true
 		local zone = GetRealZoneText and GetRealZoneText()
@@ -240,14 +241,15 @@ local function groupEnded()
 	local long = groupSince and (GetTime() - groupSince) >= MIN_GROUP_TIME
 	local choice = ns.settings.runCard
 	local subtitle = (wasInDungeon and dungeonName or "Your group") .. " · " .. minutes .. " min"
-	if #players > 0 and long and choice ~= "off" and (choice ~= "dungeons" or wasInDungeon) then
+	-- Battleground and arena groups are strangers by design; no card there.
+	if #players > 0 and long and not wasInPvP and choice ~= "off" and (choice ~= "dungeons" or wasInDungeon) then
 		if InCombatLockdown() then
 			pendingCard = { players = players, subtitle = subtitle }
 		else
 			showRunCard(players, subtitle)
 		end
 	end
-	roster, rosterOrder, groupSince, wasInDungeon, dungeonName = {}, {}, nil, false, nil
+	roster, rosterOrder, groupSince, wasInDungeon, dungeonName, wasInPvP = {}, {}, nil, false, nil, false
 end
 
 ---------------------------------------------------------------------------

@@ -16,16 +16,22 @@ local _, ns = ...
 local MAX_PLAYERS, MAX_NOTE, MAX_NAME = 2000, 200, 60
 ns.SHARED_LIMITS = { players = MAX_PLAYERS, note = MAX_NOTE, name = MAX_NAME }
 
---- Text from someone else, made safe to show: no "|" (the game's escape
---- character for colours, icons and links), no control characters, trimmed
---- and cut to a length.
+--- Text from someone else, made safe to show. "|" starts the game's codes
+--- for colours, icons and links, so those are taken out, and any "|" left
+--- over is doubled, which the game shows as a plain "|". No control
+--- characters; trimmed and cut to a length.
 function ns.CleanText(value, max)
 	if type(value) ~= "string" then return nil end
+	local PIPE = "\1\1"
+	value = value:gsub("||", PIPE)
 	-- Whole codes first, so their letters do not end up in the text:
 	-- colours, links (keeping the link's words), icons and atlases.
 	value = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
 		:gsub("|H.-|h(.-)|h", "%1"):gsub("|T.-|t", ""):gsub("|A.-|a", ""):gsub("|n", " ")
-	value = value:gsub("|", ""):gsub("%c", " ")
+	-- Any other code the game might read: a "|" followed by a letter or digit.
+	value = value:gsub("|[%w]", "")
+	value = value:gsub("%c", function(c) return c == "\1" and c or " " end)
+	value = value:gsub("|", "||"):gsub(PIPE, "||")
 	value = ns.Trim(value)
 	if value == "" then return nil end
 	if max and #value > max then value = ns.Trim(value:sub(1, max)) end

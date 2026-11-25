@@ -70,3 +70,10 @@ ns.Module("nearby alert", function()
 end)
 
 ns.NearbyConsider = consider
+
+-- You just tagged or edited this player, so you know they are there.
+ns.Listen("RECORD_CHANGED", function(key)
+	if type(key) ~= "string" then return end
+	ns.StartAlertWait("nearby", key)
+	ns.StartAlertWait("whisper", key)
+end, "nearby alert")
