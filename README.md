@@ -151,13 +151,14 @@ PlayerTags/        the addon (this folder is what goes in Interface/AddOns)
   Slash.lua        slash commands
   Media/           glyphs.tga (icon atlas), icon.tga, minimap.tga
 tests/             offline checks that run the addon against a fake game client
-tools/             build_icons.py (regenerates Media/), package.sh (builds the release zip)
+tools/             build_icons.py (regenerates Media/), build_store_art.py (media/), package.sh (release files)
 screenshots/       images used in this README
+media/             the logo for CurseForge and other store art (not in the addon zip)
 ```
 
 - Run the checks with `lua5.1 tests/run.lua`.
 - Regenerate the icons with `python3 tools/build_icons.py`. Add new glyphs at the end and never reorder them.
-- Build the release zip with `tools/package.sh`. It writes `dist/PlayerTags.zip`.
+- Build the release files with `tools/package.sh`. It writes `dist/PlayerTags.zip` (the stable download), the same zip as `PlayerTags-<version>-forever.zip`, and a `release.json` so WowUp knows it is for WoW: Forever.
 - For local work, symlink `PlayerTags/` into `_forever_/Interface/AddOns`. `/reload` picks up code changes. New files or a changed `.toc` need a full restart of the game.
 
 ## License

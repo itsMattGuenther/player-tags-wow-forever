@@ -304,7 +304,7 @@ function ns.TestRunCard()
 		{ key = "bramm coppervein", name = "Bramm Coppervein", class = "WARRIOR" },
 		{ key = "kael morrow", name = "Kael Morrow", class = "MAGE" },
 		{ key = "jory pell", name = "Jory Pell", class = "HUNTER" },
-	}, "The Deadmines · 42 min (test, nothing is saved)", true)
+	}, "The Deadmines · 42 min", true)
 end
 
 function ns.TestKillerCard()
@@ -312,7 +312,6 @@ function ns.TestKillerCard()
 		{ key = "shade vexmoor", name = "Shade Vexmoor", class = "ROGUE" },
 		{ key = "toruk blackhoof", name = "Toruk Blackhoof", class = "HUNTER" },
 	}, true)
-	killerCard.sub:SetText("Test: made-up players, nothing is saved")
 end
 
 ns.Module("cards", function()

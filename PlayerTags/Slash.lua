@@ -60,7 +60,7 @@ end
 -- addon's own frame, never the game's popup system, which addons should
 -- not borrow.
 local standIn
-local function testBox(text)
+local function testBox(title, text)
 	if not standIn then
 		standIn = ns.UI.Window("PlayerTagsTestBox", "Test", 340, 120, false)
 		standIn:SetFrameStrata("DIALOG")
@@ -74,7 +74,7 @@ local function testBox(text)
 		okay:SetScript("OnClick", function() standIn:Hide() end)
 		table.insert(UISpecialFrames, "PlayerTagsTestBox")
 	end
-	standIn:SetTitle("Stand-in for the game's box")
+	standIn:SetTitle(title)
 	standIn.text:SetText(text)
 	standIn:Show()
 	return standIn
@@ -83,17 +83,17 @@ end
 local TESTS = {
 	invite = function()
 		local info = samplePlayer(false)
-		ns.ShowWarning(testBox("Velra Duskwhisper invites you to a group.\n(Player Tags test)"),
+		ns.ShowWarning(testBox("Group invite", "Velra Duskwhisper invites you to a group."),
 			ns.ColoredName(info.rec) .. " invites you to a group", info, true)
 	end,
 	duel = function()
 		local info = samplePlayer(false)
-		ns.ShowWarning(testBox("Velra Duskwhisper wants to duel.\n(Player Tags test)"),
+		ns.ShowWarning(testBox("Duel", "Velra Duskwhisper wants to duel."),
 			ns.ColoredName(info.rec) .. " wants to duel", info, true)
 	end,
 	trade = function()
 		local info = samplePlayer(false)
-		ns.ShowWarning(testBox("Trading with Velra Duskwhisper.\n(Player Tags test)"),
+		ns.ShowWarning(testBox("Trade", "Velra Duskwhisper wants to trade."),
 			ns.ColoredName(info.rec) .. " wants to trade", info, true)
 	end,
 	whisper = function()
@@ -132,6 +132,7 @@ local function runTest(which)
 	ns.ResetAlertWaits()
 	local test = TESTS[which]
 	if test then
+		ns.Print("Showing a sample with made-up players. Nothing is saved.")
 		ns.Safe("test " .. which, test)
 		return
 	end
