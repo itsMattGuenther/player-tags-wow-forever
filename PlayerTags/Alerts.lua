@@ -67,7 +67,7 @@ end
 
 --- Shows the box. `title` is the headline; `list` holds up to four lines,
 --- each { ids = {tag ids}, text = "coloured name and tag names" }.
-function ns.ShowAlert(title, list)
+function ns.ShowAlert(title, list, sticky)
 	if not box then build() end
 	UI.ApplyScale(box)
 	box.title:SetText(title or "")
@@ -98,7 +98,8 @@ function ns.ShowAlert(title, list)
 		box.more:Hide()
 	end
 	box:SetHeight(y + 8)
-	hideAt = GetTime() + SHOW_FOR
+	-- A sticky box (the test samples) stays until it is clicked.
+	hideAt = sticky and math.huge or (GetTime() + SHOW_FOR)
 	box:Show()
 end
 
@@ -137,7 +138,7 @@ local held = {}       -- alerts waiting for the end of combat
 
 local function deliver(alert)
 	local style = alert.style or ns.settings.alertStyle or "both"
-	if style ~= "chat" then ns.ShowAlert(alert.title, alert.rows) end
+	if style ~= "chat" then ns.ShowAlert(alert.title, alert.rows, alert.sticky) end
 	if style ~= "box" and alert.chat then
 		local frame = _G.DEFAULT_CHAT_FRAME
 		if frame and frame.AddMessage then

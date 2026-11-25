@@ -99,34 +99,46 @@ local TESTS = {
 	whisper = function()
 		local info = samplePlayer(false)
 		local line = ns.ColoredName(info.rec) .. " is whispering you"
-		ns.Notify({ kind = "test", title = line, rows = ns.DescribeRows(info), chat = ns.DescribeChat(line, info), avoid = true })
+		ns.Notify({ kind = "test", sticky = true, title = line, rows = ns.DescribeRows(info), chat = ns.DescribeChat(line, info), avoid = true })
 	end,
 	nearby = function()
 		local info = samplePlayer(false)
 		local line = ns.ColoredName(info.rec) .. " is nearby"
-		ns.Notify({ kind = "test", title = line, rows = ns.DescribeRows(info), chat = ns.DescribeChat(line, info), avoid = true })
+		ns.Notify({ kind = "test", sticky = true, title = line, rows = ns.DescribeRows(info), chat = ns.DescribeChat(line, info), avoid = true })
 	end,
 	lfg = function()
 		local info = samplePlayer(true)
 		local link = "|Hplayer:Tessa Brightwell|h[Tessa Brightwell]|h"
-		ns.Notify({ kind = "test", title = ns.ColoredName(info.rec) .. " is looking for a group",
+		ns.Notify({ kind = "test", sticky = true, style = "chat", title = ns.ColoredName(info.rec) .. " is looking for a group",
 			rows = { { ids = info.ids, text = ns.TagNames(info.ids) } },
 			chat = { "|cffffd100Player Tags:|r " .. ns.TagsEscape(info.ids, 0) .. " " .. link
 				.. " is looking for a group. You tagged them |cffa7afb8" .. ns.TagNames(info.ids) .. "|r." } })
 	end,
 	group = function()
 		local bad, good = samplePlayer(false), samplePlayer(true)
-		ns.Notify({ kind = "test", title = "2 tagged players in your group", avoid = true,
+		ns.Notify({ kind = "test", sticky = true, title = "2 tagged players in your group", avoid = true,
 			rows = {
 				{ ids = bad.ids, text = ns.ColoredName(bad.rec) .. "  |cffa7afb8" .. ns.TagNames(bad.ids) .. "|r" },
 				{ ids = good.ids, text = ns.ColoredName(good.rec) .. "  |cffa7afb8" .. ns.TagNames(good.ids) .. "|r" },
 			},
 			chat = { "|cffffd100Player Tags:|r 2 tagged players in your group (test)" } })
 	end,
+	shared = function()
+		-- A made-up shared list, to see the Shared lists tab. Running it
+		-- again replaces it; Remove in the tab takes it away.
+		ns.Import(table.concat({
+			"PlayerTags share 1;Kael Morrow",
+			"P;Velra Duskwhisper;;ROGUE;ninja,leaver;",
+			"P;Grimbold Ashjaw;;WARRIOR;ganker;",
+			"P;Tessa Brightwell;;PRIEST;healer,helpful;",
+			"P;Bramm Coppervein;;WARRIOR;tank,reliable;",
+		}, "\n"), "Kael's list (sample)")
+		ns.ShowWindow("shared")
+	end,
 	run = function() ns.TestRunCard() end,
 	killer = function() ns.TestKillerCard() end,
 }
-local TEST_ORDER = { "invite", "duel", "trade", "whisper", "nearby", "lfg", "group", "run", "killer" }
+local TEST_ORDER = { "invite", "duel", "trade", "whisper", "nearby", "lfg", "group", "run", "killer", "shared" }
 
 local function runTest(which)
 	ns.ResetAlertWaits()
