@@ -38,6 +38,7 @@ local BUILTIN = {
 	{ "rival",    "info",  "Rival",        "You keep meeting in PvP",             13 },
 	{ "newbie",   "info",  "New Player",   "Still learning, go easy",             14 },
 	{ "afk",      "info",  "Goes AFK",     "Wanders off in the middle of a run",  15 },
+	{ "lowskill", "info",  "Low Skill",    "Struggled to keep up, needed carrying", 29 }, -- the anchor: dead weight
 
 	{ "rude",     "avoid", "Rude",         "Abuse or profanity in chat",          16 },
 	{ "leaver",   "avoid", "Leaver",       "Quits in the middle of a run",        17 },
@@ -47,7 +48,7 @@ local BUILTIN = {
 	{ "griefer",  "avoid", "Griefer",      "Steals tags and nodes, trains mobs",  21 },
 }
 
-ns.GLYPH_COUNT = 32 -- cells in the atlas; 22..31 are spares for custom tags
+ns.GLYPH_COUNT = 32 -- cells in the atlas; 22..31 are for custom tags (Low Skill uses 29, the anchor)
 
 local defs = {}     -- id -> merged definition
 local ordered = {}  -- every tag, in popup order

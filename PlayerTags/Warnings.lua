@@ -218,7 +218,9 @@ local function onChannel(text, sender, _, _, _, _, _, _, channelBaseName, _, _, 
 	if not looksLikeGroupSearch(text, ns.IsText(channelBaseName) and channelBaseName or nil) then return end
 
 	local short = sender:match("^([^%-]+)") or sender
-	local link = "|Hplayer:" .. sender .. "|h[" .. (info.rec and info.rec.name or short) .. "]|h"
+	-- The name to click, in their class colour like the game's own names.
+	local link = ns.ClassColorCode(info.rec and info.rec.class) .. "|Hplayer:" .. sender .. "|h["
+		.. (info.rec and info.rec.name or short) .. "]|h|r"
 	ns.Notify({
 		kind = "lfg", key = info.key or id.key, wait = 30 * 60, style = "chat",
 		title = colored(info, short) .. " is looking for a group",

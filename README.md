@@ -18,7 +18,7 @@ Everything stays on your computer. Nobody else can see your tags unless you choo
 
 **Tag anyone quickly.** Target a player and type `/tag`, press a key you bind, right-click a player or a name in chat, or right-click the minimap button. A popup opens with every tag, and you click the ones that fit.
 
-**22 tags to start, in four families:**
+**23 tags to start, in four families:**
 
 | Good people | Skilled | Good to know | Avoid |
 | --- | --- | --- | --- |
@@ -28,6 +28,7 @@ Everything stays on your computer. Nobody else can see your tags unless you choo
 | Reliable | PvP God | Rival | Ganker |
 | Patient | Good Leader | New Player | Scammer |
 | | | Goes AFK | Griefer |
+| | | Low Skill | |
 
 You can rename them, hide the ones you don't use, and make your own.
 
@@ -102,7 +103,7 @@ The windows look and behave like the game's own: Esc closes them, and the settin
 
 Player Tags is also in the game's addon menu, the small numbered button by the minimap, even if you hide its own minimap button.
 
-![The tag editor, with all 22 starter tags and the icons for custom tags](screenshots/03-tag-editor.png)
+![The tag editor, with all the starter tags and the icons for custom tags](screenshots/03-tag-editor.png)
 
 ## Good to know
 
@@ -133,7 +134,7 @@ Found a bug or have an idea for a tag? [Open an issue](https://github.com/itsMat
 ```
 PlayerTags/        the addon (this folder is what goes in Interface/AddOns)
   Core.lua         safe calls, events, module startup
-  Tags.lua         families and the 22 starter tags
+  Tags.lua         families and the 23 starter tags
   Database.lua     saved data, player identity, tagging
   Shared.lua       lists other players shared with you, kept apart from yours
   Icons.lua        icon atlas, inline icons, badges

@@ -44,7 +44,7 @@ check("slash commands registered", SLASH_PLAYERTAGS1 == "/tags" and SLASH_PLAYER
 check("key binding functions exist", type(PlayerTags_QuickTag) == "function" and type(PlayerTags_ToggleWindow) == "function")
 
 section("tags")
-check("22 starter tags", #ns.AllTags(true) == 22, #ns.AllTags(true))
+check("23 starter tags", #ns.AllTags(true) == 23, #ns.AllTags(true))
 check("every starter tag has a valid family and glyph", (function()
 	local seen = {}
 	for _, tag in ipairs(ns.AllTags(true)) do
@@ -438,7 +438,7 @@ check("rename a starter tag", ns.GetTag("rude").name == "Toxic" and ns.FindTag("
 ns.ResetTag("rude")
 check("reset a starter tag", ns.GetTag("rude").name == "Rude")
 ns.SetTagHidden("quiet", true)
-check("hidden tags leave the popup list only", #ns.AllTags(false) == 22 and #ns.AllTags(true) == 23)
+check("hidden tags leave the popup list only", #ns.AllTags(false) == 23 and #ns.AllTags(true) == 24)
 ns.SetTagHidden("quiet", false)
 
 section("export and import")
@@ -451,7 +451,7 @@ local savedPlayers, savedDefs = PlayerTagsDB.players, PlayerTagsDB.tagdefs
 PlayerTagsDB.players = {}
 PlayerTagsDB.tagdefs = { custom = {}, override = {}, hidden = {} }
 ns.InitDB()
-check("fresh database is empty", ns.PlayerCount() == 0 and #ns.AllTags(true) == 22)
+check("fresh database is empty", ns.PlayerCount() == 0 and #ns.AllTags(true) == 23)
 local summary, reason = ns.Import(text)
 check("import succeeds", summary ~= nil, reason)
 check("import restores every player", ns.PlayerCount() == count, ns.PlayerCount())
@@ -996,7 +996,23 @@ check("including the player who left early", bramRow ~= nil and lysaRow ~= nil, 
 local firstButton = bramRow and bramRow.buttons[1]
 H.run(firstButton, "OnClick")
 check("a tag clicked on the card is saved for that player", ns.GetRecord("bramm coppervein") and ns.GetRecord("bramm coppervein").tags[firstButton.tagId] ~= nil and firstButton.on)
-check("the card offers your most-used tags", #bramRow.buttons >= 5)
+local function shownTags(row)
+	local list = {}
+	for _, b in ipairs(row.buttons) do if b:IsShown() then list[#list + 1] = b.tagId end end
+	return table.concat(list, ",")
+end
+check("a Warrior is offered Great Tank and Big Damage, not Great Healer", shownTags(bramRow):find("tank", 1, true) and shownTags(bramRow):find("damage", 1, true) and not shownTags(bramRow):find("healer", 1, true), shownTags(bramRow))
+check("a Priest is offered Great Healer and Big Damage, not Great Tank", shownTags(lysaRow):find("healer", 1, true) and not shownTags(lysaRow):find("tank", 1, true), shownTags(lysaRow))
+check("everyone gets Low Skill as a negative that sets off no alarms", shownTags(bramRow):find("lowskill", 1, true) ~= nil and ns.GetTag("lowskill").family == "info")
+check("everyone gets two good tags and two Avoid tags too", #ns.FavouriteTags(2, "good") == 2 and #ns.FavouriteTags(2, "avoid") == 2
+	and shownTags(bramRow):find(ns.FavouriteTags(2, "avoid")[1], 1, true) ~= nil, shownTags(bramRow))
+check("the same tag sits in the same column on every row", (function()
+	local function xOf(row, tagId)
+		for _, b in ipairs(row.buttons) do if b.tagId == tagId then return b.__points[1].x end end
+	end
+	local avoid = ns.FavouriteTags(2, "avoid")[1]
+	return xOf(bramRow, avoid) == xOf(lysaRow, avoid) and xOf(bramRow, "damage") == xOf(lysaRow, "damage")
+end)())
 runCard():Hide()
 world.inGroup = true
 world.units.party1 = LYSA
@@ -1158,8 +1174,16 @@ check("every test runs without problems", #ns.errors == 0, ns.errors[1])
 check("tests use the addon's own stand-in box, not the game's popups", next(StaticPopupDialogs) == nil and PlayerTagsTestBox ~= nil)
 check("and saves nothing", ns.PlayerCount() == countBefore)
 local testRow = H.find(PlayerTagsRunCard, function(o) return rawget(o, "buttons") ~= nil and o:IsShown() end)[1]
-H.run(testRow.buttons[1], "OnClick")
-check("tags clicked on a test card are not saved", ns.PlayerCount() == countBefore and testRow.buttons[1].on)
+local testButton
+for _, b in ipairs(testRow.buttons) do if b:IsShown() and not testButton then testButton = b end end
+H.run(testButton, "OnClick")
+check("tags clicked on a test card are not saved", ns.PlayerCount() == countBefore and testButton.on)
+local hunterRow
+for _, row in ipairs(H.find(PlayerTagsRunCard, function(o) return rawget(o, "buttons") ~= nil and o:IsShown() end)) do
+	if row.id.class == "HUNTER" then hunterRow = row end
+end
+check("a Hunter is only offered Big Damage for a role", hunterRow and shownTags(hunterRow):find("damage", 1, true) and not shownTags(hunterRow):find("healer", 1, true) and not shownTags(hunterRow):find("tank", 1, true))
+check("More is greyed out in a test", not testRow.open:IsEnabled())
 world.chat = {}
 SlashCmdList.PLAYERTAGS("test")
 check("/tags test alone lists what can be tested", chatHas("invite, duel, trade"))

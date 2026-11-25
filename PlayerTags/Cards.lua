@@ -7,8 +7,23 @@
 local _, ns = ...
 local UI = ns.UI
 
-local ROWS, ICON, ROW_H, WIDTH = 8, 22, 30, 420
-local DEFAULT_TAGS = { "helpful", "healer", "tank", "leaver", "rude" }
+local ROWS, ICON, ROW_H, WIDTH = 8, 22, 30, 480
+local DEFAULT_GOOD = { "helpful", "company", "patient", "reliable" }
+local DEFAULT_AVOID = { "leaver", "rude", "ninja" }
+local GAP = 10 -- space between groups of buttons
+
+-- The roles each class can play, as the Skilled tags for them. A Hunter
+-- is never offered Great Healer; a Paladin or Druid gets all three.
+local ROLE_TAGS = { tank = true, healer = true, damage = true }
+local ROLES_BY_CLASS = {
+	WARRIOR = { "tank", "damage" },
+	PALADIN = { "tank", "healer", "damage" },
+	DRUID = { "tank", "healer", "damage" },
+	PRIEST = { "healer", "damage" },
+	SHAMAN = { "healer", "damage" },
+	HUNTER = { "damage" }, ROGUE = { "damage" }, MAGE = { "damage" }, WARLOCK = { "damage" },
+}
+local ALL_ROLES = { "tank", "healer", "damage" }
 local KILLER_TAGS = { "ganker", "griefer", "rival", "pvp" }
 
 ---------------------------------------------------------------------------
@@ -78,14 +93,13 @@ local function paint(card)
 end
 
 --- Fills a card. `players` is a list of identities (key, name, guid,
---- class...), `tags` the tag ids to offer. `test` makes nothing stick.
-local function fill(card, subtitle, players, tags, test)
+--- class...). `columns` is the tag ids in fixed columns, with false for a
+--- small gap between groups, so the same tag lines up on every row.
+--- `allowed(id, tagId)`, when given, leaves a column empty for a player
+--- (a Hunter has no Great Healer button). `test` makes nothing stick.
+local function fill(card, subtitle, players, columns, test, allowed)
 	card.test = test
 	card.sub:SetText(subtitle or "")
-	local valid = {}
-	for _, tagId in ipairs(tags) do
-		if ns.GetTag(tagId) then valid[#valid + 1] = tagId end
-	end
 	local shown = math.min(#players, ROWS)
 	for i, row in ipairs(card.rows) do
 		local id = players[i]
@@ -93,7 +107,12 @@ local function fill(card, subtitle, players, tags, test)
 			row.id = id
 			row.testTags = {}
 			row.name:SetText(ns.ClassColorCode(id.class) .. (id.name or "?") .. "|r")
-			for j, tagId in ipairs(valid) do
+			local x, j = 160, 0
+			for _, tagId in ipairs(columns) do
+				if not tagId then
+					x = x + GAP
+				else
+				j = j + 1
 				local b = row.buttons[j]
 				if not b then
 					b = UI.IconToggle(row, ICON)
@@ -120,10 +139,17 @@ local function fill(card, subtitle, players, tags, test)
 				b.tagId = tagId
 				b.badge:SetTag(tagId)
 				b:ClearAllPoints()
-				b:SetPoint("LEFT", row, "LEFT", 160 + (j - 1) * (ICON + 6), 0)
-				b:Show()
+				b:SetPoint("LEFT", row, "LEFT", x, 0)
+				if ns.GetTag(tagId) and (not allowed or allowed(id, tagId)) then b:Show() else b:Hide() end
+				x = x + ICON + 6
+				end
 			end
-			for j = #valid + 1, #row.buttons do row.buttons[j]:Hide() end
+			for k = j + 1, #row.buttons do row.buttons[k]:Hide() end
+			-- In a test the full popup would save a real record for a
+			-- made-up player, so More is greyed out there.
+			row.open:SetEnabled(not card.test)
+			row.open.tip = card.test and "Not available in the test: it would save a made-up player."
+				or "Open the full tagging popup for this player."
 			row.open:SetScript("OnClick", function()
 				if card.test then return end
 				ns.OpenQuickTag(row.id, card)
@@ -161,13 +187,21 @@ ns.Listen("SETTINGS_CHANGED", function()
 	for _, card in ipairs(cards) do UI.ApplyScale(card) end
 end, "cards")
 
---- Your five most-used tags, for the after-group buttons.
-function ns.FavouriteTags(n)
-	n = n or 5
+--- Your most-used tags of one kind, for the after-group buttons: "good"
+--- (anything that is not a role and not Avoid) or "avoid". Filled up from
+--- sensible defaults when you have not used enough yet.
+function ns.FavouriteTags(n, kind)
+	n = n or 2
+	local function fits(tagId)
+		local tag = ns.GetTag(tagId)
+		if not tag or ROLE_TAGS[tagId] then return false end
+		if kind == "avoid" then return tag.family == "avoid" end
+		return tag.family ~= "avoid" and tagId ~= "lowskill"
+	end
 	local counts = {}
 	for _, rec in pairs(ns.db.players) do
 		for tagId in pairs(rec.tags) do
-			if ns.GetTag(tagId) then counts[tagId] = (counts[tagId] or 0) + 1 end
+			if fits(tagId) then counts[tagId] = (counts[tagId] or 0) + 1 end
 		end
 	end
 	local ids = {}
@@ -182,12 +216,34 @@ function ns.FavouriteTags(n)
 		picked[#picked + 1] = tagId
 		seen[tagId] = true
 	end
-	for _, tagId in ipairs(DEFAULT_TAGS) do
+	for _, tagId in ipairs(kind == "avoid" and DEFAULT_AVOID or DEFAULT_GOOD) do
 		if #picked >= n then break end
-		if not seen[tagId] and ns.GetTag(tagId) then picked[#picked + 1] = tagId end
+		if not seen[tagId] and fits(tagId) then picked[#picked + 1] = tagId end
 	end
 	ns.SortTagIds(picked)
 	return picked
+end
+
+--- The after-group columns: the three roles, then your two most-used good
+--- tags, then the negatives: Low Skill and your two most-used Avoid tags.
+function ns.GroupCardColumns()
+	local columns = { "tank", "healer", "damage", false }
+	for _, tagId in ipairs(ns.FavouriteTags(2, "good")) do columns[#columns + 1] = tagId end
+	columns[#columns + 1] = false
+	columns[#columns + 1] = "lowskill"
+	for _, tagId in ipairs(ns.FavouriteTags(2, "avoid")) do columns[#columns + 1] = tagId end
+	return columns
+end
+
+-- Role buttons only for roles the player's class can play.
+local function roleAllowed(id, tagId)
+	if not ROLE_TAGS[tagId] then return true end
+	local roles = ROLES_BY_CLASS[id and id.class or ""]
+	if not roles then return true end
+	for _, role in ipairs(roles) do
+		if role == tagId then return true end
+	end
+	return false
 end
 
 ---------------------------------------------------------------------------
@@ -231,7 +287,7 @@ end
 
 local function showRunCard(players, subtitle, test)
 	if not runCard then runCard = makeCard("PlayerTagsRunCard", "Tag your group?", "runcard", 120) end
-	fill(runCard, subtitle, players, ns.FavouriteTags(5), test)
+	fill(runCard, subtitle, players, ns.GroupCardColumns(), test, roleAllowed)
 end
 
 local function groupEnded()

@@ -62,12 +62,16 @@ end
 local standIn
 local function testBox(title, text)
 	if not standIn then
-		standIn = ns.UI.Window("PlayerTagsTestBox", "Test", 340, 120, false)
+		standIn = ns.UI.Window("PlayerTagsTestBox", "Test", 340, 110, false)
 		standIn:SetFrameStrata("DIALOG")
 		standIn:SetPoint("TOP", UIParent, "TOP", 0, -160)
+		-- A plain dialog: no inset panel, the message centred between the
+		-- title and the button.
+		standIn.Inset:Hide()
 		standIn.text = ns.UI.Text(standIn, "GameFontHighlight")
-		standIn.text:SetPoint("TOPLEFT", standIn.Inset, "TOPLEFT", 10, -10)
-		standIn.text:SetPoint("RIGHT", standIn.Inset, "RIGHT", -10, 0)
+		local middle = (ns.UI.BAR - 22) / 2 -- halfway between the title bar and the button bar
+		standIn.text:SetPoint("LEFT", standIn, "LEFT", 16, middle)
+		standIn.text:SetPoint("RIGHT", standIn, "RIGHT", -16, middle)
 		standIn.text:SetJustifyH("CENTER")
 		local okay = ns.UI.Button(standIn, OKAY or "Okay", 90, 22)
 		okay:SetPoint("BOTTOMRIGHT", standIn, "BOTTOMRIGHT", -10, ns.UI.BAR_Y)
@@ -108,7 +112,7 @@ local TESTS = {
 	end,
 	lfg = function()
 		local info = samplePlayer(true)
-		local link = "|Hplayer:Tessa Brightwell|h[Tessa Brightwell]|h"
+		local link = ns.ClassColorCode("PRIEST") .. "|Hplayer:Tessa Brightwell|h[Tessa Brightwell]|h|r"
 		ns.Notify({ kind = "test", sticky = true, style = "chat", title = ns.ColoredName(info.rec) .. " is looking for a group",
 			rows = { { ids = info.ids, text = ns.TagNames(info.ids) } },
 			chat = { "|cffffd100Player Tags:|r " .. ns.TagsEscape(info.ids, 0) .. " " .. link
