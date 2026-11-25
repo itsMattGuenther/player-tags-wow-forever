@@ -880,6 +880,7 @@ H.run(warning(), "OnUpdate")
 TradeFrame = H.new("Frame")
 world.units.NPC = GRIM
 H.fire("TRADE_SHOW")
+H.flush()
 check("the trade window shows their tags under it", warning():IsShown() and warning().anchor == TradeFrame and warning().title:GetText():find("trade", 1, true) ~= nil)
 TradeFrame:Hide()
 H.run(warning(), "OnUpdate")
@@ -969,6 +970,7 @@ ns.SetTag(grim, "griefer", false)
 H.fire("NAME_PLATE_UNIT_ADDED", H.SECRET)
 H.fire("CHAT_MSG_SAY", H.SECRET, H.SECRET, "", "", "", "", 0, 0, "", 0, 22, H.SECRET)
 check("hidden units and senders cause no errors", #ns.errors == 0, ns.errors[1])
+check("hidden yes-or-no answers count as no", ns.IsTrue(H.SECRET) == false and ns.IsTrue(true) and not ns.IsTrue(1))
 H.fire("NAME_PLATE_UNIT_REMOVED", "nameplate7")
 world.units.nameplate7 = nil
 

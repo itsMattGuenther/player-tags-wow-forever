@@ -12,7 +12,7 @@ Everything stays on your computer. Nobody else can see your tags unless you choo
 
 **[Download the latest version](https://github.com/itsMattGuenther/player-tags-wow-forever/releases/latest/download/PlayerTags.zip)** · [All releases](https://github.com/itsMattGuenther/player-tags-wow-forever/releases)
 
-Version 1.0.0, built for WoW: Forever (interface 16001). Also on WowUp: choose **Install from URL** and paste this page's address. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
+Version 1.0.0, built for WoW: Forever (interface 16001). WowUp users can try **Install from URL** with this page's address. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
 
 ## What you get
 
@@ -65,6 +65,8 @@ You can rename them, hide the ones you don't use, and make your own.
   <img src="screenshots/08-group-card.png" alt="The window after a group: each player with role, good and negative tags as buttons" width="49%">
   <img src="screenshots/09-killer-card.png" alt="The window after a world PvP death, listing enemy players who were near" width="49%">
 </p>
+
+*These heads-ups and windows were captured with `/tags test`, which shows each one with made-up players. For the invite, it draws a stand-in for the game's invite box; the Player Tags part underneath is the same as with a real invite.*
 
 Want to see them without waiting for the real thing? `/tags test` shows each one with made-up players, and nothing is saved.
 

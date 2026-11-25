@@ -13,18 +13,19 @@ local _, ns = ...
 
 local function inInstance()
 	local ok, inside = pcall(IsInInstance)
-	return ok and inside == true
+	return ok and ns.IsTrue(inside)
 end
 
 local function inMyGroup(unit, guid)
 	if unit then
 		local ok, party = pcall(UnitInParty, unit)
 		local ok2, raid = pcall(UnitInRaid, unit)
-		if (ok and party == true) or (ok2 and raid ~= nil and raid ~= false and not ns.IsSecret(raid)) then return true end
+		if ok and ns.IsTrue(party) then return true end
+		if ok2 and ns.Num(raid) ~= nil then return true end
 	end
 	if ns.IsText(guid) and IsGUIDInGroup then
 		local ok, inGroup = pcall(IsGUIDInGroup, guid)
-		if ok and inGroup == true then return true end
+		if ok and ns.IsTrue(inGroup) then return true end
 	end
 	return false
 end
@@ -48,7 +49,7 @@ end
 local function fromUnit(unit)
 	if unit == nil or ns.IsSecret(unit) or type(unit) ~= "string" then return end
 	local ok, isPlayer = pcall(UnitIsPlayer, unit)
-	if not ok or isPlayer ~= true then return end
+	if not ok or not ns.IsTrue(isPlayer) then return end
 	consider(ns.IdentifyUnit(unit), unit, "is nearby")
 end
 

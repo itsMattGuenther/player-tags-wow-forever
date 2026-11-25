@@ -270,8 +270,9 @@ local function noteRoster()
 	if not IsInGroup() then return end
 	groupSince = groupSince or GetTime()
 	local ok, inside, kind = pcall(IsInInstance)
-	if ok and inside == true and (kind == "pvp" or kind == "arena") then wasInPvP = true end
-	if ok and inside == true and (kind == "party" or kind == "raid") then
+	inside = ok and ns.IsTrue(inside)
+	if inside and (kind == "pvp" or kind == "arena") then wasInPvP = true end
+	if inside and (kind == "party" or kind == "raid") then
 		wasInDungeon = true
 		local zone = GetRealZoneText and GetRealZoneText()
 		if ns.IsText(zone) then dungeonName = zone end
@@ -318,7 +319,7 @@ local recentEnemies = {} -- GUID -> { id, t }
 local function noteEnemy(unit)
 	if unit == nil or ns.IsSecret(unit) or type(unit) ~= "string" then return end
 	local ok, isPlayer, enemy = pcall(function() return UnitIsPlayer(unit), UnitIsEnemy("player", unit) end)
-	if not ok or isPlayer ~= true or enemy ~= true then return end
+	if not ok or not ns.IsTrue(isPlayer) or not ns.IsTrue(enemy) then return end
 	local id = ns.IdentifyUnit(unit)
 	if id and id.guid then recentEnemies[id.guid] = { id = id, t = GetTime() } end
 end
@@ -339,7 +340,7 @@ end
 local function onDeath()
 	if not ns.settings.killerCard then return end
 	local ok, inside = pcall(IsInInstance)
-	if ok and inside == true then return end
+	if ok and ns.IsTrue(inside) then return end
 	local now, list = GetTime(), {}
 	for guid, seen in pairs(recentEnemies) do
 		if now - seen.t <= RECENT then list[#list + 1] = seen else recentEnemies[guid] = nil end

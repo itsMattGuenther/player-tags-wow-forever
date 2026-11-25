@@ -27,6 +27,13 @@ function ns.IsText(v)
 	return type(v) == "string" and v ~= ""
 end
 
+--- True only for a plain, readable true. The game can hand back a hidden
+--- answer instead, and comparing one of those is an error.
+function ns.IsTrue(v)
+	if v == nil or ns.IsSecret(v) then return false end
+	return v == true
+end
+
 --- A plain, readable number, or nil.
 function ns.Num(v)
 	if v == nil or ns.IsSecret(v) then return nil end

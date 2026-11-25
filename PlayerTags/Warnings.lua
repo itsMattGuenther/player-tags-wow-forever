@@ -156,9 +156,12 @@ local function onTrade()
 	local id = ns.IdentifyUnit("NPC")
 	local info = id and ns.TagsFor(id)
 	if not info then return end
-	local window = _G.TradeFrame
-	if window and not window:IsShown() then window = nil end
-	ns.ShowWarning(window, colored(info, id.name) .. " wants to trade", info, ns.ShouldWarn(info))
+	-- The game opens its trade window for the same event; look a moment later.
+	C_Timer.After(0.1, function()
+		local window = _G.TradeFrame
+		if window and not window:IsShown() then window = nil end
+		ns.ShowWarning(window, colored(info, id.name) .. " wants to trade", info, ns.ShouldWarn(info))
+	end)
 end
 
 ---------------------------------------------------------------------------
