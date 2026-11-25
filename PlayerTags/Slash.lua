@@ -128,16 +128,22 @@ local TESTS = {
 			chat = { "|cffffd100Player Tags:|r 2 tagged players in your group (test)" } })
 	end,
 	shared = function()
-		-- A made-up shared list, to see the Shared lists tab. Running it
-		-- again replaces it; Remove in the tab takes it away.
+		-- Two made-up shared lists, to see the Shared lists tab. Running it
+		-- again replaces them; Remove in the tab takes them away.
 		ns.Import(table.concat({
 			"PlayerTags share 1;Kael Morrow",
-			"P;Velra Duskwhisper;;ROGUE;ninja,leaver;",
-			"P;Grimbold Ashjaw;;WARRIOR;ganker;",
-			"P;Tessa Brightwell;;PRIEST;healer,helpful;",
+			"P;Velra Duskwhisper;;ROGUE;ninja,leaver;Needed on every blue",
+			"P;Grimbold Ashjaw;;WARRIOR;ganker;Camps the Darkshire flight path",
+			"P;Tessa Brightwell;;PRIEST;healer,helpful;Best healer in Ironforge",
 			"P;Bramm Coppervein;;WARRIOR;tank,reliable;",
 		}, "\n"), "Kael's list (sample)")
-		ns.ShowWindow("shared")
+		ns.Import(table.concat({
+			"PlayerTags share 1;Lysa Thornfield",
+			"P;Shade Vexmoor;;ROGUE;ganker,griefer;",
+			"P;Toruk Blackhoof;;HUNTER;rival,pvp;",
+			"P;Jory Pell;;HUNTER;helpful,company;Ran me through Wailing Caverns",
+		}, "\n"), "Guild friends (sample)")
+		ns.ShowSharedLists()
 	end,
 	run = function() ns.TestRunCard() end,
 	killer = function() ns.TestKillerCard() end,

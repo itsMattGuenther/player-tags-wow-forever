@@ -167,3 +167,58 @@ end
 function ns.ShouldWarn(info)
 	return info ~= nil and (info.avoid or info.sharedAvoid)
 end
+
+---------------------------------------------------------------------------
+-- Editing a shared list: it is yours now, so you can trim it.
+---------------------------------------------------------------------------
+local function changed()
+	ns.RebuildShared()
+	ns.Fire("RECORD_CHANGED")
+end
+
+function ns.RenameSharedList(listId, name)
+	local list = ns.db.shared[listId]
+	name = ns.CleanText(name, MAX_NAME)
+	if not list or not name then return false end
+	list.name = name
+	changed()
+	return true
+end
+
+function ns.RemoveSharedPlayer(listId, key)
+	local list = ns.db.shared[listId]
+	if not list or not list.players[key] then return false end
+	list.players[key] = nil
+	changed()
+	return true
+end
+
+--- Takes one tag off a player in a shared list. A player left with no
+--- tags and no note leaves the list.
+function ns.RemoveSharedTag(listId, key, tagId)
+	local list = ns.db.shared[listId]
+	local p = list and list.players[key]
+	if not p or not p.tags[tagId] then return false end
+	p.tags[tagId] = nil
+	if next(p.tags) == nil and not ns.IsText(p.note) then list.players[key] = nil end
+	changed()
+	return true
+end
+
+--- Copies a shared player's tags into your own list, as tags you made, and
+--- their note if you have none. Returns how many tags were added.
+function ns.AdoptSharedPlayer(listId, key)
+	local list = ns.db.shared[listId]
+	local p = list and list.players[key]
+	if not p then return 0 end
+	local id = ns.IdentifyName(p.name or key, p.guid)
+	if not id then return 0 end
+	id.class = id.class or p.class
+	local added = 0
+	for tagId in pairs(p.tags) do
+		if ns.GetTag(tagId) and ns.SetTag(id, tagId, true) then added = added + 1 end
+	end
+	local rec = ns.Lookup(id)
+	if rec and ns.IsText(p.note) and not ns.IsText(rec.note) then ns.SetNote(id, p.note) end
+	return added
+end

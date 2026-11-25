@@ -1119,6 +1119,28 @@ check("until you turn alerts on for that list", chatHas("talking nearby"))
 ns.ShowWindow("shared")
 local listRow = H.find(PlayerTagsFrame, function(o) return rawget(o, "listId") == listId and o:IsShown() end)[1]
 check("the Shared lists tab shows the list", listRow ~= nil and listRow.name:GetText() == "Kael's list")
+H.run(listRow.open, "OnClick")
+local memberRows = H.find(PlayerTagsFrame, function(o) return rawget(o, "tagButtons") ~= nil and o:IsShown() end)
+check("Open shows who is in the list, with their tags", #memberRows == 2 and memberRows[1].tagButtons[1]:IsShown(), #memberRows)
+local grimRow
+for _, row in ipairs(memberRows) do if row.key == "grimbold ashjaw" then grimRow = row end end
+H.run(grimRow.adopt, "OnClick")
+check("Add to mine copies their tags into your own list", ns.GetRecord("grimbold ashjaw").tags.leaver ~= nil)
+ns.SetTag(ns.IdentifyName("Grimbold Ashjaw", "Player-1-GRIM"), "leaver", false)
+H.run(grimRow.tagButtons[1], "OnClick")
+check("clicking a tag takes it off the list; a player with nothing left leaves it", ns.db.shared[listId].players["grimbold ashjaw"] == nil)
+local vexRow
+for _, row in ipairs(H.find(PlayerTagsFrame, function(o) return rawget(o, "tagButtons") ~= nil and o:IsShown() end)) do
+	if row.key == "vexred morrow" then vexRow = row end
+end
+H.run(vexRow.remove, "OnClick")
+H.run(vexRow.remove, "OnClick")
+check("Remove takes one player out of the list, after Sure?", ns.db.shared[listId] ~= nil and ns.db.shared[listId].players["vexred morrow"] == nil)
+PlayerTagsFrame.__children = PlayerTagsFrame.__children -- (no-op: keeps the window open)
+ns.RenameSharedList(listId, "Kael |cffff0000renamed|r")
+check("a list can be renamed, cleaned like any shared text", ns.db.shared[listId].name == "Kael renamed")
+ns.ShowSharedLists()
+listRow = H.find(PlayerTagsFrame, function(o) return rawget(o, "listId") == listId and o:IsShown() end)[1]
 H.run(listRow.remove, "OnClick")
 H.run(listRow.remove, "OnClick")
 check("Remove takes the whole list away, and nothing of yours", ns.db.shared[listId] == nil and ns.PlayerCount() == ownBefore and ns.TagsFor(ns.IdentifyName("Vexred Morrow")) == nil)
@@ -1189,10 +1211,10 @@ SlashCmdList.PLAYERTAGS("test")
 check("/tags test alone lists what can be tested", chatHas("invite, duel, trade"))
 SlashCmdList.PLAYERTAGS("test shared")
 local sample = ns.SharedLists()
-check("/tags test shared adds one made-up list and shows the tab", #sample == 1 and sample[1].list.name == "Kael's list (sample)" and PlayerTagsFrame.selectedTab == 3)
+check("/tags test shared adds two made-up lists and shows the tab", #sample == 2 and sample[1].list.name == "Kael's list (sample)" and PlayerTagsFrame.selectedTab == 3)
 SlashCmdList.PLAYERTAGS("test shared")
-check("running it again replaces it", #ns.SharedLists() == 1)
-ns.RemoveSharedList(sample[1].id)
+check("running it again replaces them", #ns.SharedLists() == 2)
+for _, item in ipairs(ns.SharedLists()) do ns.RemoveSharedList(item.id) end
 ns.ToggleWindow()
 SlashCmdList.PLAYERTAGS("test nearby")
 check("test alerts stay until clicked", ns.IsAlertShown())
