@@ -10,9 +10,9 @@ Player Tags fixes that. Tag a player in a couple of clicks (Helpful, Great Heale
 
 Everything stays on your computer. Nobody else can see your tags unless you choose to give them a copy, and other players are never told you tagged them.
 
-**[Download the latest version](https://github.com/itsMattGuenther/player-tags-wow-forever/releases/latest/download/PlayerTags.zip)** · [All releases](https://github.com/itsMattGuenther/player-tags-wow-forever/releases)
+**[Get it on CurseForge](https://www.curseforge.com/wow/addons/player-tags)** · **[Download the latest version](https://github.com/itsMattGuenther/player-tags-wow-forever/releases/latest/download/PlayerTags.zip)** · [All releases](https://github.com/itsMattGuenther/player-tags-wow-forever/releases)
 
-Version 1.0.1, built for WoW: Forever (interface 16001). WowUp users can try **Install from URL** with this page's address. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
+Version 1.0.1, built for WoW: Forever (interface 16001). It's also on [CurseForge](https://www.curseforge.com/wow/addons/player-tags), so the CurseForge app can install it and keep it up to date. WowUp users can try **Install from URL** with this page's address. If something looks wrong, type `/tags status` and [open an issue](https://github.com/itsMattGuenther/player-tags-wow-forever/issues) with what it says.
 
 ## What you get
 
@@ -90,6 +90,10 @@ Want to see them without waiting for the real thing? `/tags test` shows each one
 ![The Shared lists tab, with a list opened to show its players](screenshots/11-shared-list.png)
 
 ## Install
+
+**The easy way:** get it from [CurseForge](https://www.curseforge.com/wow/addons/player-tags). If you use the CurseForge app, install it from there and the app keeps it updated.
+
+**By hand:**
 
 1. Download **[PlayerTags.zip](https://github.com/itsMattGuenther/player-tags-wow-forever/releases/latest/download/PlayerTags.zip)** from the latest release.
 2. Find your WoW: Forever folder. In the Battle.net app, choose World of Warcraft: Forever, click the gear next to **Play**, and pick **Show in Explorer** (**Show in Finder** on a Mac). Open the `_forever_` folder.
