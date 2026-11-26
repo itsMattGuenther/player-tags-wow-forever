@@ -2,6 +2,8 @@
 
 **A World of Warcraft: Forever addon for remembering the people you meet.**
 
+[![Get it on CurseForge](https://img.shields.io/badge/Get%20it%20on-CurseForge-F16436?style=for-the-badge&logo=curseforge&logoColor=white)](https://www.curseforge.com/wow/addons/player-tags)
+
 ![The Player Tags list, with the tagging popup open beside it](screenshots/01-list-and-tag-popup.png)
 
 You run a dungeon with a healer who carries the whole group, and a week later you can't remember their name. Or someone ninjas the last drop and drops group, and a month later they're in your party again and you don't recognise them until it's too late.
